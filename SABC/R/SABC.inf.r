@@ -44,82 +44,80 @@ SABC.inf <- function(f.dist, d.prior, r.prior,
   ## Define global variables:
   ##-------------------------
 
+  ## Dimension of theta
   dim.par     <- length(r.prior())
-  new.sample  <- FALSE  # Has the prior sample been renewed?
 
-  E <- to.tensor(NA,dims=c("k"=n.sample, "alpha"=dim.par+2))  # Ensemble
-  P <- NULL                                                   # Joint prior sample
+  ## Has the prior sample been renewed?
+  new.sample  <- FALSE
 
-  s <- 0        # Small constant for preventing degeneration of covariance matrix
-  a.force <- 6  # Positive constant as in eq. (51)
+  ## Ensemble of particles
+  E <- matrix(NA, nrow=n.sample, ncol=dim.par+2)
 
-  ##------------------
-  ## Define functions:
-  ##------------------
+  ## Small constant for preventing degeneration of covariance matrix
+  s <- 0.0001
 
-  ## Define mean U and V using P:
+  ## Positive constant as in eq. (51)
+  a.force <- 6
+
+  iter <- 0
+
+  ##------------------------
+  ## Define a few functions:
+  ##------------------------
+
+  ## Define mean U and V using P (42-43):
   X <- function(eps.1, eps.2){
     if(new.sample){
-      SS <-  sum(exp(log.weights - P[,dim.par+1]/
-                 eps.1-eps.2*P[,dim.par+2]))
-      U  <- (sum(exp(log.weights - P[,dim.par+1]/
-                 eps.1-eps.2*P[,dim.par+2])*P[,dim.par+1]))/SS
-      V  <- (sum(exp(log.weights - P[,dim.par+1]/
-                 eps.1-eps.2*P[,dim.par+2])*P[,dim.par+2]))/SS
+      SS <-  sum(exp(log.weights - P[,dim.par + 1] /
+                 eps.1 - eps.2 * P[,dim.par + 2]))
+      U  <- (sum(exp(log.weights - P[,dim.par + 1] /
+                 eps.1 - eps.2 * P[,dim.par + 2]) * P[,dim.par +1 ])) / SS
+      V  <- (sum(exp(log.weights - P[,dim.par + 1] /
+                 eps.1 - eps.2 * P[,dim.par + 2]) * P[,dim.par + 2])) / SS
     } else {
-      SS <-  sum(exp(-P[,dim.par+1]/
-                 eps.1-eps.2*P[,dim.par+2]))
-      U  <- (sum(exp(-P[,dim.par+1]/
-                 eps.1-eps.2*P[,dim.par+2])*P[,dim.par+1]))/SS
-      V  <- (sum(exp(-P[,dim.par+1]/
-                 eps.1-eps.2*P[,dim.par+2])*P[,dim.par+2]))/SS
+      SS <-  sum(exp(-P[,dim.par + 1] /
+                 eps.1 - eps.2 * P[,dim.par + 2]))
+      U  <- (sum(exp(-P[,dim.par + 1] /
+                 eps.1 - eps.2 * P[,dim.par + 2]) * P[,dim.par + 1])) / SS
+      V  <- (sum(exp(-P[,dim.par + 1] /
+                 eps.1 - eps.2 * P[,dim.par + 2]) * P[,dim.par + 2])) / SS
     }
     return(c(U,V))
   }
 
-  ## Define L using E and P:
+  ## Define L using E and P (45):
   L <- function(eps.1, eps.2){
-    U.sys.ten <-  rep(E[["alpha"=dim.par+1]], times=N.thin, pos=2, name="kp")
+    U.sys <-  matrix(E[,dim.par+1], ncol=N.thin)
+    V.sys <-  matrix(E[,dim.par+2], ncol=N.thin)
+    chi <- ifelse(((U.sys - U.pri) / eps.1
+                   + (1 + eps.2) * (V.sys - V.pri)) >= 0,1,0)
 
-    V.sys.ten <-  rep(E[["alpha"=dim.par+2]], times=N.thin, pos=2, name="kp")
-
-    chi.ten <- to.tensor(ifelse (
-      ((U.sys.ten-U.pri.ten)/eps.1+(1+eps.2)*(V.sys.ten-V.pri.ten))>=0,
-                              1,0),
-                         names=c("k","kp")
-                         )
-
-    if(new.sample)  tmp <- k*exp(log.weights.ten + V.pri.ten)*chi.ten
-    else            tmp <- k*exp(V.pri.ten)*chi.ten
-
+    if(new.sample)
+      tmp <- k * exp(log.weights + V.pri) * chi
+    else
+      tmp <- k * exp(V.pri) * chi
     den <- n.sample * N.thin
 
-    L.11 <- sum((U.sys.ten - U.pri.ten)^2 * tmp)/den
-    L.22 <- sum((V.sys.ten - V.pri.ten)^2 * tmp)/den
-    L.12 <- sum((U.sys.ten - U.pri.ten)*(V.sys.ten - V.pri.ten) * tmp)/den
-
+    L.11 <- sum((U.sys - U.pri)^2 * tmp) / den
+    L.22 <- sum((V.sys - V.pri)^2 * tmp) / den
+    L.12 <- sum((U.sys - U.pri) * (V.sys - V.pri) * tmp) / den
     return(c(L.11,L.12,L.22))
   }
 
-  # Define schedule:
+  ## Define schedule:
 
-  Schedule <- function(eps.1, eps.2, eps.2.e)
-  {
-    aa <- L(eps.1,eps.2)
+  Schedule <- function(eps.1, eps.2, eps.2.e){
+    aa <- L(eps.1, eps.2)
     de <- eps.2 - eps.2.e
-    disk <- aa[2]^2*de^2 - aa[1]*(aa[3]*de^2-v)
-    kappa <- ifelse(disk>0, (-aa[2]*de-sqrt(disk))/aa[1],0)
-    return((eps.1^(-1)-kappa)^(-1))
+    disk <- aa[2]^2 * de^2 - aa[1] * (aa[3] * de^2 - v)
+    kappa <- ifelse(disk > 0, (-aa[2] * de - sqrt(disk)) / aa[1], 0)
+    return((1/eps.1 - 1/ kappa))
   }
 
-  # Define k density matrix:
+  ## Define k density matrix:  TODO all
 
-  K <- function(Covar.jump)
-  {
+  K <- function(Covar.jump){
     jump.inv <- solve(Covar.jump)
-
-    Sigma.tensor <- to.tensor(jump.inv)
-    names(Sigma.tensor) <- c("alpha","beta")
 
     system.tensor <- rep(E[["alpha"=(1:dim.par),drop=FALSE]], times=N.thin,  pos=2, name="kp")
     Theta.tensor  <- add.tensor(system.tensor, prior.tensor, op="-")
@@ -133,18 +131,17 @@ SABC.inf <- function(f.dist, d.prior, r.prior,
 
   # Effective sample size:
 
-  ESS <- function(eps.1,eps.2)
-  {
-    weights <- exp(-P[,dim.par + 1]/eps.1-P[,dim.par+2]*eps.2)
+  ESS <- function(eps.1,eps.2){
+    weights <- exp( -P[,dim.par + 1] / eps.1 - P[,dim.par + 2] * eps.2)
     weights <- weights/sum(weights)
     return(sum(weights^2)^(-1))
   }
 
   ## ------------------
-  ## 1. initialization
+  ## Initialization
   ## ------------------
 
-  ## 1.1 sample initial population
+  ## sample initial population
 
   if(summarystats)
   {
@@ -235,71 +232,68 @@ SABC.inf <- function(f.dist, d.prior, r.prior,
         iter <- iter + 1
       }
 
-  }
-  else
-  {
-    iter <- 1       # counter for likelihood draws during initialization
-    i    <- 1       # counter for initial population E
+  } else {
+    ## Create matrix of rejected and accepted particles,
+    ## dynamic increasing of nrow
+    P <- matrix(NA, nrow=2*n.sample, ncol=dim.par+2)
 
-    while(i <= n.sample)
-    {
-      if(iter>iter.max) stop("'iter.max' reached! No initial sample could be generated.")
+    counter <- 0  # Number of accepted particles in E
+    while(counter < n.sample){
+      ## Show progress:
+      if(!is.null(verbose) && iter %% verbose == 0)
+        cat('Likelihoods calls ' , iter/iter.max*100, '% \n')
 
-      # Propose particle:
+      ## Check if we reached maximum number of likelihood evaluations
+      iter <- iter + 1
+      if(iter > iter.max)
+          stop("'iter.max' reached! No initial sample could be generated.")
 
-      theta.p <- r.prior()
-      v.p     <- -log(d.prior(theta.p))
-      rho.p   <- f.dist(theta.p,...)
+      ## Generate new particle
+      theta.p <- r.prior()  # Generate a proposal
+      rho.p <- f.dist(theta.p, ...)  # Calculate distance from target
+      v.p     <- -log(d.prior(theta.p))  #Calculate likelihood
 
-      # Store particle in prior matrix:
 
-      P <- rbind(P,c(theta.p,rho.p,v.p))
-
-      # If close enough to target, store particle in ensemble matrix:
-
-      if( runif(1) < exp(-rho.p/eps.init) )
-      {
-        E[i,1:dim.par] <- t(theta.p)
-        E[i,dim.par+1] <- rho.p
-        E[i,dim.par+2] <- v.p
-        i <- i+1
+      ## Accept with Prob=exp(-rho.p/eps.init)
+      if(runif(1) < exp(-rho.p / eps.init)){
+        counter <- counter + 1
+        E[counter,] <- c(theta.p, rho.p, v.p)
       }
-      iter    <- iter+1
+
+      ## Add to P and increase its size if full
+      if(iter > nrow(P))
+          P <- rbind(P, matrix(NA, nrow=n.sample, ncol=dim.par + 2))
+      P[iter,] <- c(theta.p, rho.p, v.p)
     }
 
+    ## Remove empty rows of P due to dynamic allocation
+    P <- P[1:iter,]
   }
-
   N.prior  <- nrow(P)
 
-  # Define initial epsilons:
-
+  ## Define initial epsilons:
   eps.1 <- eps.init
   eps.2 <- 0
 
-  # Estimate covariation matrix of parameters
+  ## Jump covariance matrix of parameters
 
-  Covar <- var(E[,1:dim.par])
+  Covar.jump <- beta * var(E[,1:dim.par]) + s * diag(1,dim.par)
 
-  # draw a smaller sample from prior and prepare tensors:
+  ## draw a smaller sample from prior and prepare tensors:
 
   N.thin <- 300
 
   indices.2 <- sample(1:N.prior, N.thin)
 
-  U.pri.ten <-  rep(to.tensor(P[indices.2,dim.par+1]),
-                    times=n.sample,  pos=1, name="k")
-  names(U.pri.ten) <- c("k","kp")
+  U.pri <-  matrix(P[indices.2,dim.par+1]),ncol=n.sample)
 
-  V.pri.ten <-  rep(to.tensor(P[indices.2,dim.par+2]),
-                    times=n.sample,  pos=1, name="k")
-  names(V.pri.ten) <- c("k","kp")
+  V.pri <- matrix(P[indices.2,dim.par+2], ncol=n.sample)
 
   prior.tensor  <- rep(to.tensor(as.vector(P[indices.2,1:dim.par]),dims=c(kp=N.thin,alpha=dim.par)),
                        times=n.sample,pos=1,name="k" )
 
-  # Calculate jump matrix
 
-  Covar.jump <- beta*Covar + s*diag(1,dim.par)
+
 
   # Calculate k density matrix:
 
