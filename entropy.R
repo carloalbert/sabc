@@ -140,32 +140,32 @@ abline(h=ent.exact,col="red")
 error.rel <- abs(ent.est - ent.exact)/ent.exact
 plot(error.rel)
 
+# calculate exact entropy for sum of two normals:
+
 
 
 # SABC with entropy measurements:
 #================================
-##---------------------------
-## Initialize all containers:
-##---------------------------
 
-## Dimension of theta
-dim.par <- length(r.prior())
+n.sample <- 10000
+iter.max <- 50*n.sample
+verbose  <- n.sample
+eps.init <- 0.2
+v <- 0.2
+beta <- 0.9
 
-## Ensemble, each row contains a particle (theta,rho)
-E <- matrix(NA, nrow=n.sample, ncol=dim.par+1)
-
-## Global counter which is bounded by iter.max
-iter <- 0
-
-## Small constant for preventing degeneration of covariance matrix
 s <- 0.0001
 
+adaptjump = FALSE
+
+dim.par <- length(r.prior())
 
 ##------------------------
 ## Define a few functions:
 ##------------------------
 
 ## Define functions for moments of mu:
+
 Rho.mean <- function(epsilon)
   return( (sum(exp( -P[,dim.par + 1] / epsilon) * P[,dim.par + 1])) /
             sum(exp( -P[,dim.par + 1] / epsilon)))
@@ -182,44 +182,58 @@ Phi <- function(rho)
 f.dist.new <- function(theta, ...)
   return(Phi(f.dist(theta, ...)))
 
+# Define log-likelihood:
+
+loglikeli <- function(x,theta)
+{
+  log(1+
+        (sigma1/sigma2)*
+        exp(
+          - (x-theta/2)^2/(2*sigma2^2) + 
+            (x-theta)^2  /(2*sigma1^2)
+           ) 
+      ) -   (x-theta)^2/(2*sigma1^2)
+}
 
 ## ------------------
 ## Initialization
 ## ------------------
 
-  ## Create matrix of rejected and accepted particles,
-  ## dynamic increasing of nrow
-  P <- matrix(NA, nrow=2*n.sample, ncol=dim.par+1)
+E <- matrix(NA, nrow=n.sample, ncol=dim.par+2)
+P <- matrix(NA, nrow=2*n.sample, ncol=dim.par+2)
+
+iter <- 0
+counter <- 0  # Number of accepted particles in E
+
+while(counter < n.sample){
+  ## Show progress:
+  if(!is.null(verbose) && iter %% verbose == 0)
+    cat('Likelihoods calls ' , iter/iter.max*100, '% \n')
   
-  counter <- 0  # Number of accepted particles in E
-  while(counter < n.sample){
-    ## Show progress:
-    if(!is.null(verbose) && iter %% verbose == 0)
-      cat('Likelihoods calls ' , iter/iter.max*100, '% \n')
-    
-    ## Check if we reached maximum number of likelihood evaluations
-    iter <- iter + 1
-    if(iter > iter.max)
-      stop("'iter.max' reached! No initial sample could be generated.")
-    
-    ## Generate new particle
-    theta.p <- r.prior()  # Generate a proposal
-    rho.p <- f.dist(theta.p)  # Calculate distance from target
-    
-    ## Accept with Prob=exp(-rho.p/eps.init)
-    if(runif(1) < exp(-rho.p / eps.init)){
-      counter <- counter + 1
-      E[counter,] <- c(theta.p, rho.p)
-    }
-    
-    ## Add to P and increase its size if full
-    if(iter > nrow(P))
-      P <- rbind(P, matrix(NA, nrow=n.sample, ncol=dim.par + 1))
-    P[iter,] <- c(theta.p, rho.p)
+  ## Check if we reached maximum number of likelihood evaluations
+  iter <- iter + 1
+  if(iter > iter.max)
+    stop("'iter.max' reached! No initial sample could be generated.")
+  
+  ## Generate new particle
+  theta.p <- r.prior()  # Generate a proposal
+  x.p <- r.model(theta.p)
+  rho.p <- (x.p - y)^2  # Calculate distance from target
+  
+  ## Accept with Prob=exp(-rho.p/eps.init)
+  if(runif(1) < exp(-rho.p / eps.init)){
+    counter <- counter + 1
+    E[counter,] <- c(theta.p, rho.p, x.p)
   }
   
-  ## Remove empty rows of P due to dynamic allocation
-  P <- P[1:iter,]
+  ## Add to P and increase its size if full
+  if(iter > nrow(P))
+    P <- rbind(P, matrix(NA, nrow=n.sample, ncol=dim.par + 2))
+  P[iter,] <- c(theta.p, rho.p, x.p)
+}
+
+## Remove empty rows of P due to dynamic allocation
+P <- P[1:iter,]
 
 
 ## Distances in old metric
@@ -246,22 +260,35 @@ accept  <- 0
 
 ## Entropy buckets:
 
-entropy.system <- vector( length = (iter.max-iter)/verbose )
-entropy.production <- vector( length = (iter.max-iter)/verbose )
-entropy.production.endorev <- vector( length = (iter.max-iter)/verbose )
+entropy.system <- vector( length = ceiling((iter.max-iter)/verbose) )
+entropy.production <- vector( length = ceiling((iter.max-iter)/verbose) )
+entropy.production.endorev <- vector( length = ceiling((iter.max-iter)/verbose) )
 
+# counter for system entropy calculations:
+counter <- 1
+
+E.scaled <- E[,c(1,3)]
+E.scaled[,2] <- E.scaled[,2]/U
+ent.scaled <- entropy(E.scaled,k=10)[10]
+entropy.system[1] <- ent.scaled + log(U)
+  
+entropy.production[1] <- 0
+entropy.production.endorev[1] <- 0
 
 while (iter <= iter.max)
 {
-  
-  for(i in 1:verbose){
+  entropy.flow <- 0
+  entropy.prod <- 0
+  for(i in 1:verbose)
+  {
     ## Select one arbitrary particle:
     index <- sample(1:n.sample, 1)
     
     ## Sample proposal parameter and calculate new distance:
     theta.p <- E[index,1:dim.par] +
       mvrnorm(1, mu=rep(0, dim.par), Sigma=Covar.jump)
-    rho.p   <- f.dist.new(theta.p)
+    x.p <- r.model(theta.p)
+    rho.p   <- (x.p - y)^2
     if(is.na(rho.p))
       next()
     ## Calculate acceptance probability:
@@ -269,9 +296,24 @@ while (iter <= iter.max)
     likeli.prob <- exp((E[index,dim.par+1] - rho.p) / eps)
     
     ## If accepted
-    if(runif(1) < prior.prob * likeli.prob){
+    if(runif(1) < prior.prob * likeli.prob)
+    {
+      ## Increment entropy flow:
+      
+      loglikeli.old <- loglikeli(E[index,3],E[index,1])
+      loglikeli.new <- loglikeli(x.p,theta.p)
+      
+      entropy.flow <- entropy.flow + 
+        (E[index,2] - rho.p) / (n.sample*eps) + 
+        (loglikeli.new - loglikeli.old)/n.sample
+      
+      ## Increment entropy production under endoreversibility assumption:
+      
+      entropy.prod <- entropy.prod + 
+        (E[index,2] - rho.p) * ( 1/eps - 1/U ) / n.sample 
+      
       ## Update E
-      E[index,] <- c(theta.p, rho.p)
+      E[index,] <- c(theta.p, rho.p, x.p)
       
       ## Optionally: Update jump distribution covariance
       if(adaptjump)
@@ -287,28 +329,36 @@ while (iter <= iter.max)
       accept <- accept + 1
     }
   }
+  
   iter <- iter + verbose
+  counter <- counter + 1
+  
+  ## Calculate system entropy:
+  
+  E.scaled <- E[,c(1,3)]
+  E.scaled[,2] <- E.scaled[,2]/U
+  ent.scaled <- entropy(E.scaled,k=10)[10]
+  
+  entropy.system[counter] <- ent.scaled + log(U)
+  
+  ## Calculate entropy production:
+  
+  entropy.difference <- entropy.system[counter] - entropy.system[counter+1]
+  
+  entropy.production[counter] <- entropy.flow - entropy.difference 
+  entropy.production.endorev[counter] <- entropy.prod
+    
+  
   ## Show progress:
   cat('updates' , iter / iter.max * 100, '% \t',
       'eps '  , eps, '\t',
       'u.mean'  , U, '\n')
-  
-  ## Resampling
-  if(accept >= resample){
-    ## Weighted resampling:
-    w <- exp(-E[,dim.par + 1] * delta / eps)
-    w <- w/sum(w)
-    index.resampled <- sample(1:n.sample, n.sample, replace=TRUE, prob=w)
-    E <- E[index.resampled,]
-    
-    ## Update U and epsilon:
-    eps <- eps * (1 - delta)
-    U <- mean(E[,dim.par + 1])
-    eps <- Schedule(U)
-    
-    ## Print effective sampling size TODO: sense of summing over these weights?
-    cat("Resampling. Effective sampling size: ", 1/sum((w/sum(w))^2), "\n")
-    accept <- 0
-  }
 }
 
+
+# Plotting results:
+
+plot(entropy.production)
+points(entropy.production.endorev,col="red")
+
+plot(entropy.system)
