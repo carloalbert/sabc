@@ -151,7 +151,7 @@ n.sample <- 10000
 iter.max <- 50*n.sample
 verbose  <- n.sample
 eps.init <- 0.2
-v <- 0.2
+v <- 2.
 beta <- 0.9
 
 s <- 0.0001
@@ -288,7 +288,7 @@ while (iter <= iter.max)
     theta.p <- E[index,1:dim.par] +
       mvrnorm(1, mu=rep(0, dim.par), Sigma=Covar.jump)
     x.p <- r.model(theta.p)
-    rho.p   <- (x.p - y)^2
+    rho.p   <- Phi((x.p - y)^2)
     if(is.na(rho.p))
       next()
     ## Calculate acceptance probability:
