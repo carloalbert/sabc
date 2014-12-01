@@ -147,24 +147,12 @@ plot(error.rel)
 # SABC with entropy measurements:
 #================================
 
-n.sample <- 10000
-iter.max <- 50*n.sample
-verbose  <- n.sample
-eps.init <- 0.2
-v <- 2.
-beta <- 0.9
-
-s <- 0.0001
-
-adaptjump = FALSE
-
-dim.par <- length(r.prior())
-
 ##------------------------
 ## Define a few functions:
 ##------------------------
 
 ## Define functions for moments of mu:
+dim.par <- length(r.prior())
 
 Rho.mean <- function(epsilon)
   return( (sum(exp( -P[,dim.par + 1] / epsilon) * P[,dim.par + 1])) /
@@ -191,9 +179,22 @@ loglikeli <- function(x,theta)
         exp(
           - (x-theta/2)^2/(2*sigma2^2) + 
             (x-theta)^2  /(2*sigma1^2)
-           ) 
-      ) -   (x-theta)^2/(2*sigma1^2)
+        ) 
+  ) -   (x-theta)^2/(2*sigma1^2)
 }
+
+# Set SABC parameters:
+#--------------------
+n.sample <- 10000
+iter.max <- 50*n.sample
+verbose  <- n.sample
+eps.init <- 0.2
+v <- 20
+beta <- 0.2
+
+s <- 0.0001
+
+adaptjump = FALSE
 
 ## ------------------
 ## Initialization
@@ -294,10 +295,10 @@ while (iter <= iter.max)
     ## Calculate acceptance probability:
     prior.prob  <- d.prior(theta.p) / d.prior(E[index,1:dim.par])
     likeli.prob <- exp((E[index,dim.par+1] - rho.p) / eps)
-    
+        
     ## If accepted
     if(runif(1) < prior.prob * likeli.prob)
-    {
+    {      
       ## Increment entropy flow:
       
       loglikeli.old <- loglikeli(E[index,3],E[index,1])
@@ -310,7 +311,7 @@ while (iter <= iter.max)
       ## Increment entropy production under endoreversibility assumption:
       
       entropy.prod <- entropy.prod + 
-        (E[index,2] - rho.p) * ( 1/eps - 1/U ) / n.sample 
+        (E[index,2] - rho.p) * ( 1/eps - 1/U ) / n.sample
       
       ## Update E
       E[index,] <- c(theta.p, rho.p, x.p)
@@ -336,14 +337,16 @@ while (iter <= iter.max)
   ## Calculate system entropy:
   
   E.scaled <- E[,c(1,3)]
-  E.scaled[,2] <- E.scaled[,2]/U
+  E.scaled[,2] <- (E.scaled[,2]-y)/U
   ent.scaled <- entropy(E.scaled,k=10)[10]
   
   entropy.system[counter] <- ent.scaled + log(U)
+
+  entropy.system[counter] <- entropy(E[,c(1,3)],k=10)[10]
   
   ## Calculate entropy production:
   
-  entropy.difference <- entropy.system[counter] - entropy.system[counter+1]
+  entropy.difference <- entropy.system[counter-1] - entropy.system[counter]
   
   entropy.production[counter] <- entropy.flow - entropy.difference 
   entropy.production.endorev[counter] <- entropy.prod
@@ -362,3 +365,26 @@ plot(entropy.production)
 points(entropy.production.endorev,col="red")
 
 plot(entropy.system)
+
+plot(E[,1],E[,3])
+points(P[,1],P[,3],col="green")
+
+# Sample from exact posterior:
+
+E.exact <- vector( length = n.sample )
+for (i in 1:n.sample ) E.exact[i] <- r.post()
+
+# Plot posterior:
+
+plot(f.post, 0,2.5)
+hist(E[,1], breaks=n.sample/200, freq=FALSE, add=TRUE)
+hist(E.exact, breaks=n.sample/200, freq=FALSE, add=TRUE, col="red")
+
+# Check share of sample points in each hump:
+
+length(which(E[,1]<1.5))/length(which(E[,1]>1.5))
+length(which(E.exact<1.5))/length(which(E.exact>1.5))
+
+# KL-divergence to target:
+
+plot(KL.divergence(E[,1], E.exact, k=50))
