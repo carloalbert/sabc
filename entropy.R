@@ -8,140 +8,142 @@ library(MASS)
 library(FNN)
 #library(entropy)
 
-sigma1 <- .1
-sigma2 <- .01
+sigma1 <- .07
+sigma2 <- .05
 
 # model:
 
 r.model <- function(theta)
 {
   if (runif(1)<0.5) return(rnorm(1,theta, sigma1))
-  else return(rnorm(1,theta/2,sigma2))
+  else return(rnorm(1,theta/10,sigma2))
 }
 
 # prior:
 
 r.prior <- function()
 {
-  runif(1)*3
+  runif(1)*4
 }
 
-d.prior <- function(theta) 1
+d.prior <- function(theta) 1/4
 
 # data
 
-y <- 1.
+y <- 0.2
 
 # posterior:
 
 f.post <- function(theta)
 {
   (exp(-( theta - y )^2/( 2*sigma1^2 ))/sigma1 +
-     exp(-( theta/2 - y )^2/( 2*sigma2^2 ))/sigma2 )/( 3*sqrt(2*pi) )
+     exp(-( theta/10 - y )^2/( 2*sigma2^2 ))/sigma2 )/( 11*sqrt(2*pi) )
 }
+
+integrate(f.post,-10,10)
 
 r.post <- function()
 {
-  if ( runif(1)< 1/3 ) return( rnorm(1,y,sigma1) )
-  else return( rnorm(1,2*y,2*sigma2))
+  if ( runif(1)< 1/11 ) return( rnorm(1,y,sigma1) )
+  else return( rnorm(1,10*y,10*sigma2))
 }
 
-# SABC:
+# # SABC:
+# 
+# n.sample <- 1000
+# iter.max <- 50*n.sample
+# 
+# res <- SABC(r.model, r.prior, d.prior,
+#             n.sample = n.sample,
+#             eps.init = 0.2,
+#             iter.max = iter.max,
+#             v = 2,
+#             beta=0.2,
+#             delta=0.1, resample=5*n.sample,
+#             verbose=n.sample,
+#             method="noninformative", adaptjump=TRUE,
+#             y = y)
+# 
+# # Sample from exact posterior:
+# 
+# E.exact <- vector( length = n.sample )
+# for (i in 1:n.sample ) E.exact[i] <- r.post()
+# 
+# # Plot posterior:
+# 
+# plot(f.post, 0,2.5)
+# hist(res$E[,1], breaks=n.sample/20, freq=FALSE, add=TRUE)
+# hist(E.exact, breaks=n.sample/20, freq=FALSE, add=TRUE, col="red")
+# 
+# # Check share of sample points in each hump:
+# 
+# length(which(res$E[,1]<1.5))/length(which(res$E[,1]>1.5))
+# length(which(E.exact<1.5))/length(which(E.exact>1.5))
 
-n.sample <- 1000
-iter.max <- 50*n.sample
-
-res <- SABC(r.model, r.prior, d.prior,
-            n.sample = n.sample,
-            eps.init = 0.2,
-            iter.max = iter.max,
-            v = 2,
-            beta=0.2,
-            delta=0.1, resample=5*n.sample,
-            verbose=n.sample,
-            method="noninformative", adaptjump=TRUE,
-            y = y)
-
-# Sample from exact posterior:
-
-E.exact <- vector( length = n.sample )
-for (i in 1:n.sample ) E.exact[i] <- r.post()
-
-# Plot posterior:
-
-plot(f.post, 0,2.5)
-hist(res$E[,1], breaks=n.sample/20, freq=FALSE, add=TRUE)
-hist(E.exact, breaks=n.sample/20, freq=FALSE, add=TRUE, col="red")
-
-# Check share of sample points in each hump:
-
-length(which(res$E[,1]<1.5))/length(which(res$E[,1]>1.5))
-length(which(E.exact<1.5))/length(which(E.exact>1.5))
-
-# Calculate KL divergence:
-#=========================
-
-# With nearest neighbours:
-
-plot(KL.divergence(res$E[,1], E.exact, k=500))
-
-# with density estimation:
-
-dens        <- density(res$E[,1])
-dens.exact  <- density(E.exact,from=min(dens$x), to=max(dens$x))
-plot(dens)
-points(dens.exact,col="red")
-
-dx <- dens$x[2] - dens$x[1]
-tmp <- dens$y*log(dens$y/dens.exact$y)
-tmp[which(tmp==Inf)]=NA
-KL <- sum(tmp,na.rm=TRUE)*dx
-KL
-
-sum(dens.exact$y)*dx
+# # Calculate KL divergence:
+# #=========================
+# 
+# # With nearest neighbours:
+# 
+# plot(KL.divergence(res$E[,1], E.exact, k=500))
+# 
+# # with density estimation:
+# 
+# dens        <- density(res$E[,1])
+# dens.exact  <- density(E.exact,from=min(dens$x), to=max(dens$x))
+# plot(dens)
+# points(dens.exact,col="red")
+# 
+# dx <- dens$x[2] - dens$x[1]
+# tmp <- dens$y*log(dens$y/dens.exact$y)
+# tmp[which(tmp==Inf)]=NA
+# KL <- sum(tmp,na.rm=TRUE)*dx
+# KL
+# 
+# sum(dens.exact$y)*dx
 
 
-# check entropy estimates based on FNN:
-#======================================
-
-# generate test data:
-
-Sigma <- diag(c(1,0.00001))
-test <- mvrnorm(10000, mu=c(0,0), Sigma=Sigma)
-#plot(test)
-
-# calculate exact entropy:
-
-ent.exact <- (1+log(2*pi)) + 0.5*log(det(Sigma))
-
-# calculate entropy based on nearest neighbors:
-
-ent.est <- entropy(test,k=20, algorithm="kd_tree")
-
-# scaling
-
-eps <- 0.001
-test.scaled <- test
-test.scaled[,2] <- test.scaled[,2]/eps
-ent.scaled <- entropy(test.scaled,k=20)
-ent.est.2 <- ent.scaled + log(eps)
-
-# entropy based on discretization:
-
-#test.disc <- discretize2d(test.scaled[,1],test.scaled[,2],12,12)
-#entropy(test.disc)
-
-# plotting:
-
-plot(ent.est,ylim=c(ent.exact*0.9,ent.exact*1.1))
-points(ent.est.2, col="green")
-abline(h=ent.exact,col="red")
-
-error.rel <- abs(ent.est - ent.exact)/ent.exact
-plot(error.rel)
-
-# calculate exact entropy for sum of two normals:
-
+# # check entropy estimates based on FNN:
+# #======================================
+# 
+# # generate test data:
+# 
+# Sigma <- diag(c(1,0.00001))
+# test <- mvrnorm(10000, mu=c(0,0), Sigma=Sigma)
+# #plot(test)
+# 
+# # calculate exact entropy:
+# 
+# ent.exact <- (1+log(2*pi)) + 0.5*log(det(Sigma))
+# 
+# # calculate entropy based on nearest neighbors:
+# 
+# ent.est <- entropy(test,k=20, algorithm="kd_tree")
+# 
+# # scaling
+# 
+# eps <- 0.001
+# test.scaled <- test
+# test.scaled[,2] <- test.scaled[,2]/eps
+# ent.scaled <- entropy(test.scaled,k=20)
+# ent.est.2 <- ent.scaled + log(eps)
+# 
+# # entropy based on discretization:
+# 
+# #test.disc <- discretize2d(test.scaled[,1],test.scaled[,2],12,12)
+# #entropy(test.disc)
+# 
+# # plotting:
+# 
+# plot(ent.est,ylim=c(ent.exact*0.9,ent.exact*1.1))
+# points(ent.est.2, col="green")
+# abline(h=ent.exact,col="red")
+# 
+# error.rel <- abs(ent.est - ent.exact)/ent.exact
+# plot(error.rel)
+# 
+# # calculate exact entropy for sum of two normals:
+# 
 
 
 # SABC with entropy measurements:
@@ -174,13 +176,10 @@ f.dist.new <- function(theta, ...)
 
 loglikeli <- function(x,theta)
 {
-  log(1+
-        (sigma1/sigma2)*
-        exp(
-          - (x-theta/2)^2/(2*sigma2^2) + 
-            (x-theta)^2  /(2*sigma1^2)
-        ) 
-  ) -   (x-theta)^2/(2*sigma1^2)
+  log(
+      exp( - (x-theta   )^2/(2*sigma1^2) ) / sigma1   + 
+      exp( - (x-theta/10)^2/(2*sigma2^2) ) / sigma2 
+     ) 
 }
 
 # Set SABC parameters:
@@ -189,7 +188,7 @@ n.sample <- 10000
 iter.max <- 50*n.sample
 verbose  <- n.sample
 eps.init <- 0.2
-v <- 20
+v <- 4
 beta <- 0.2
 
 s <- 0.0001
@@ -376,15 +375,36 @@ for (i in 1:n.sample ) E.exact[i] <- r.post()
 
 # Plot posterior:
 
-plot(f.post, 0,2.5)
-hist(E[,1], breaks=n.sample/200, freq=FALSE, add=TRUE)
-hist(E.exact, breaks=n.sample/200, freq=FALSE, add=TRUE, col="red")
+plot(f.post, 0,4)
+hist(E[,1], breaks=n.sample/20, freq=FALSE, add=TRUE)
+hist(E.exact, breaks=n.sample/20, freq=FALSE, add=TRUE, col="red")
 
 # Check share of sample points in each hump:
 
-length(which(E[,1]<1.5))/length(which(E[,1]>1.5))
-length(which(E.exact<1.5))/length(which(E.exact>1.5))
+length(which(E[,1]<1.0))/length(which(E[,1]>1.0))
+length(which(E.exact<1.0))/length(which(E.exact>1.0))
 
 # KL-divergence to target:
 
-plot(KL.divergence(E[,1], E.exact, k=50))
+plot(KL.divergence(E.exact, E[,1], k=50))
+
+# total entropy production:
+
+sum(entropy.production)
+
+# #check:
+# 
+# test1 <- rnorm(10000)
+# test2 <- rnorm(10000,0,0.5)
+# 
+# hist(test1,freq=FALSE)
+# hist(test2,add=TRUE,freq=FALSE,col="red")
+# 
+# plot(KL.divergence(test1,test2,k=30))
+# points(-mean(log(dnorm(test1,0,0.5))) - entropy(test1,k=20),col="red")
+# 
+# plot(KL.divergence(test2,test1,k=30))
+# points(-mean(log(dnorm(test2))) - entropy(test2,k=20),col="red")
+# 
+# 
+
