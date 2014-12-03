@@ -9,7 +9,7 @@ library(FNN)
 #library(entropy)
 
 sigma1 <- .07
-sigma2 <- .05
+sigma2 <- .03
 
 # model:
 
@@ -185,11 +185,11 @@ loglikeli <- function(x,theta)
 # Set SABC parameters:
 #--------------------
 n.sample <- 10000
-iter.max <- 50*n.sample
+iter.max <- 120*n.sample
 verbose  <- n.sample
 eps.init <- 0.2
-v <- 4
-beta <- 0.2
+v <- 1
+beta <- 0.05
 
 s <- 0.0001
 
@@ -376,8 +376,8 @@ for (i in 1:n.sample ) E.exact[i] <- r.post()
 # Plot posterior:
 
 plot(f.post, 0,4)
-hist(E[,1], breaks=n.sample/20, freq=FALSE, add=TRUE)
-hist(E.exact, breaks=n.sample/20, freq=FALSE, add=TRUE, col="red")
+hist(E[,1], breaks=n.sample/5, freq=FALSE, add=TRUE)
+hist(E.exact, breaks=n.sample/70, freq=FALSE, add=TRUE, col="red")
 
 # Check share of sample points in each hump:
 
