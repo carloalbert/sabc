@@ -184,16 +184,31 @@ loglikeli <- function(x,theta)
 
 # Set SABC parameters:
 #--------------------
+
+# best so far: iter.max = 50*n.sample, beta = 0.05, there seems to be a minimal
+# entropy production for v between 2 and 100.
+
 n.sample <- 10000
-iter.max <- 120*n.sample
+iter.max <- 50*n.sample
 verbose  <- n.sample
-eps.init <- 0.2
-v <- 1
-beta <- 0.05
+eps.init <- 0.2 
+#v <- 10
+#beta <- 0.5
 
 s <- 0.0001
 
 adaptjump = FALSE
+
+vs <- c(1,2,3,5,7,10,100)
+betas <- seq(0.1,0.9,by=0.1)
+EP <- matrix(nrow=length(vs),ncol=length(betas))
+entropy_final <- matrix(nrow=length(vs),ncol=length(betas))
+
+for(v_counter in 1:length(vs)){  
+for(beta_counter in 1:length(betas) ){
+
+  v <- vs[v_counter]
+  beta <- betas[beta_counter]
 
 ## ------------------
 ## Initialization
@@ -365,8 +380,8 @@ points(entropy.production.endorev,col="red")
 
 plot(entropy.system)
 
-plot(E[,1],E[,3])
-points(P[,1],P[,3],col="green")
+# plot(E[,1],E[,3])
+# points(P[,1],P[,3],col="green")
 
 # Sample from exact posterior:
 
@@ -378,19 +393,33 @@ for (i in 1:n.sample ) E.exact[i] <- r.post()
 plot(f.post, 0,4)
 hist(E[,1], breaks=n.sample/5, freq=FALSE, add=TRUE)
 hist(E.exact, breaks=n.sample/70, freq=FALSE, add=TRUE, col="red")
+legend("topright", c(paste("iter.max =", iter.max),
+                     paste("v =",v), 
+                     paste("beta =",beta)))
 
 # Check share of sample points in each hump:
 
-length(which(E[,1]<1.0))/length(which(E[,1]>1.0))
-length(which(E.exact<1.0))/length(which(E.exact>1.0))
+# length(which(E[,1]<1.0))/length(which(E[,1]>1.0))
+# length(which(E.exact<1.0))/length(which(E.exact>1.0))
 
 # KL-divergence to target:
 
 plot(KL.divergence(E.exact, E[,1], k=50))
+legend("topright", c(paste("iter.max =", iter.max),
+                     paste("v =",v), 
+                     paste("beta =",beta)))
+
+entropy_final[v_counter,beta_counter] <- KL.divergence(E.exact, E[,1], k=50)[20] 
 
 # total entropy production:
 
-sum(entropy.production)
+EP[v_counter,beta_counter] <- sum(entropy.production)
+
+}}
+
+image(entropy_final[-c(1,2),-c(1,2)], col=terrain.colors(30))
+
+image(EP,col=terrain.colors(40))
 
 # #check:
 # 
