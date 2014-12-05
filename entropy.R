@@ -8,142 +8,54 @@ library(MASS)
 library(FNN)
 #library(entropy)
 
-sigma1 <- .07
-sigma2 <- .03
+mass_ratio <- 4
+
+sigma1 <- .5
+sigma2 <- .1/mass_ratio
+  
+prior_range <- 10
 
 # model:
 
 r.model <- function(theta)
 {
   if (runif(1)<0.5) return(rnorm(1,theta, sigma1))
-  else return(rnorm(1,theta/10,sigma2))
+  else return(rnorm(1,theta/mass_ratio,sigma2))
 }
 
 # prior:
 
 r.prior <- function()
 {
-  runif(1)*4
+  runif(1)*prior_range
 }
 
-d.prior <- function(theta) 1/4
+d.prior <- function(theta) 1/prior_range
 
 # data
 
-y <- 0.2
+y <- 2
 
 # posterior:
 
 f.post <- function(theta)
 {
   (exp(-( theta - y )^2/( 2*sigma1^2 ))/sigma1 +
-     exp(-( theta/10 - y )^2/( 2*sigma2^2 ))/sigma2 )/( 11*sqrt(2*pi) )
+     exp(-( theta/mass_ratio - y )^2/( 2*sigma2^2 ))/sigma2 )/( (mass_ratio+1)*sqrt(2*pi) )
 }
 
-integrate(f.post,-10,10)
+integrate(f.post,-100,100)
 
 r.post <- function()
 {
-  if ( runif(1)< 1/11 ) return( rnorm(1,y,sigma1) )
-  else return( rnorm(1,10*y,10*sigma2))
+  if ( runif(1)< 1/(mass_ratio+1) ) return( rnorm(1,y,sigma1) )
+  else return( rnorm(1,mass_ratio*y,mass_ratio*sigma2))
 }
 
-# # SABC:
-# 
-# n.sample <- 1000
-# iter.max <- 50*n.sample
-# 
-# res <- SABC(r.model, r.prior, d.prior,
-#             n.sample = n.sample,
-#             eps.init = 0.2,
-#             iter.max = iter.max,
-#             v = 2,
-#             beta=0.2,
-#             delta=0.1, resample=5*n.sample,
-#             verbose=n.sample,
-#             method="noninformative", adaptjump=TRUE,
-#             y = y)
-# 
-# # Sample from exact posterior:
-# 
-# E.exact <- vector( length = n.sample )
-# for (i in 1:n.sample ) E.exact[i] <- r.post()
-# 
-# # Plot posterior:
-# 
-# plot(f.post, 0,2.5)
-# hist(res$E[,1], breaks=n.sample/20, freq=FALSE, add=TRUE)
-# hist(E.exact, breaks=n.sample/20, freq=FALSE, add=TRUE, col="red")
-# 
-# # Check share of sample points in each hump:
-# 
-# length(which(res$E[,1]<1.5))/length(which(res$E[,1]>1.5))
-# length(which(E.exact<1.5))/length(which(E.exact>1.5))
+# Sample from exact posterior:
 
-# # Calculate KL divergence:
-# #=========================
-# 
-# # With nearest neighbours:
-# 
-# plot(KL.divergence(res$E[,1], E.exact, k=500))
-# 
-# # with density estimation:
-# 
-# dens        <- density(res$E[,1])
-# dens.exact  <- density(E.exact,from=min(dens$x), to=max(dens$x))
-# plot(dens)
-# points(dens.exact,col="red")
-# 
-# dx <- dens$x[2] - dens$x[1]
-# tmp <- dens$y*log(dens$y/dens.exact$y)
-# tmp[which(tmp==Inf)]=NA
-# KL <- sum(tmp,na.rm=TRUE)*dx
-# KL
-# 
-# sum(dens.exact$y)*dx
-
-
-# # check entropy estimates based on FNN:
-# #======================================
-# 
-# # generate test data:
-# 
-# Sigma <- diag(c(1,0.00001))
-# test <- mvrnorm(10000, mu=c(0,0), Sigma=Sigma)
-# #plot(test)
-# 
-# # calculate exact entropy:
-# 
-# ent.exact <- (1+log(2*pi)) + 0.5*log(det(Sigma))
-# 
-# # calculate entropy based on nearest neighbors:
-# 
-# ent.est <- entropy(test,k=20, algorithm="kd_tree")
-# 
-# # scaling
-# 
-# eps <- 0.001
-# test.scaled <- test
-# test.scaled[,2] <- test.scaled[,2]/eps
-# ent.scaled <- entropy(test.scaled,k=20)
-# ent.est.2 <- ent.scaled + log(eps)
-# 
-# # entropy based on discretization:
-# 
-# #test.disc <- discretize2d(test.scaled[,1],test.scaled[,2],12,12)
-# #entropy(test.disc)
-# 
-# # plotting:
-# 
-# plot(ent.est,ylim=c(ent.exact*0.9,ent.exact*1.1))
-# points(ent.est.2, col="green")
-# abline(h=ent.exact,col="red")
-# 
-# error.rel <- abs(ent.est - ent.exact)/ent.exact
-# plot(error.rel)
-# 
-# # calculate exact entropy for sum of two normals:
-# 
+E.exact <- vector( length = n.sample )
+for (i in 1:n.sample ) E.exact[i] <- r.post()
 
 
 # SABC with entropy measurements:
@@ -178,7 +90,7 @@ loglikeli <- function(x,theta)
 {
   log(
       exp( - (x-theta   )^2/(2*sigma1^2) ) / sigma1   + 
-      exp( - (x-theta/10)^2/(2*sigma2^2) ) / sigma2 
+      exp( - (x-theta/mass_ratio)^2/(2*sigma2^2) ) / sigma2 
      ) 
 }
 
@@ -189,20 +101,20 @@ loglikeli <- function(x,theta)
 # entropy production for v between 2 and 100.
 
 n.sample <- 10000
-iter.max <- 50*n.sample
+iter.max <- 70*n.sample
 verbose  <- n.sample
-eps.init <- 0.2 
-#v <- 10
-#beta <- 0.5
+eps.init <- 1
+v <- 10
+beta <- 0.1
 
 s <- 0.0001
 
 adaptjump = FALSE
 
-vs <- c(1,2,3,5,7,10,100)
-betas <- seq(0.1,0.9,by=0.1)
+vs <- c(0.5,1,5,10,300)
+betas <- seq(0.1,0.5,by=0.1)
 EP <- matrix(nrow=length(vs),ncol=length(betas))
-entropy_final <- matrix(nrow=length(vs),ncol=length(betas))
+KL <- matrix(nrow=length(vs),ncol=length(betas))
 
 for(v_counter in 1:length(vs)){  
 for(beta_counter in 1:length(betas) ){
@@ -375,22 +287,18 @@ while (iter <= iter.max)
 
 # Plotting results:
 
-plot(entropy.production)
-points(entropy.production.endorev,col="red")
-
-plot(entropy.system)
+# plot(entropy.production)
+# points(entropy.production.endorev,col="red")
+# 
+# plot(entropy.system)
 
 # plot(E[,1],E[,3])
 # points(P[,1],P[,3],col="green")
 
-# Sample from exact posterior:
-
-E.exact <- vector( length = n.sample )
-for (i in 1:n.sample ) E.exact[i] <- r.post()
 
 # Plot posterior:
 
-plot(f.post, 0,4)
+plot(f.post, 0,prior_range)
 hist(E[,1], breaks=n.sample/5, freq=FALSE, add=TRUE)
 hist(E.exact, breaks=n.sample/70, freq=FALSE, add=TRUE, col="red")
 legend("topright", c(paste("iter.max =", iter.max),
@@ -404,12 +312,16 @@ legend("topright", c(paste("iter.max =", iter.max),
 
 # KL-divergence to target:
 
-plot(KL.divergence(E.exact, E[,1], k=50))
-legend("topright", c(paste("iter.max =", iter.max),
-                     paste("v =",v), 
-                     paste("beta =",beta)))
+# plot(KL.divergence(E.exact, E[,1], k=50))
+# legend("topright", c(paste("iter.max =", iter.max),
+#                      paste("v =",v), 
+#                      paste("beta =",beta)))
 
-entropy_final[v_counter,beta_counter] <- KL.divergence(E.exact, E[,1], k=50)[20] 
+# ratio of rejections:
+
+# accept/iter.max
+
+KL[v_counter,beta_counter] <- KL.divergence(E.exact, E[,1], k=50)[20] 
 
 # total entropy production:
 
@@ -417,9 +329,10 @@ EP[v_counter,beta_counter] <- sum(entropy.production)
 
 }}
 
-image(entropy_final[-c(1,2),-c(1,2)], col=terrain.colors(30))
-
-image(EP,col=terrain.colors(40))
+# 
+image(KL, col=terrain.colors(30))
+# 
+# image(EP,col=terrain.colors(40))
 
 # #check:
 # 
