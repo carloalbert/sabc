@@ -8,12 +8,16 @@ library(MASS)
 library(FNN)
 #library(entropy)
 
-mass_ratio <- 4
+mass_ratio <- 2.5
 
 sigma1 <- .5
 sigma2 <- .1/mass_ratio
   
-prior_range <- 10
+prior_range <- 3.5
+
+y <- 1
+
+#plot(f.post, 0,prior_range)
 
 # model:
 
@@ -31,10 +35,6 @@ r.prior <- function()
 }
 
 d.prior <- function(theta) 1/prior_range
-
-# data
-
-y <- 2
 
 # posterior:
 
@@ -101,26 +101,26 @@ loglikeli <- function(x,theta)
 # entropy production for v between 2 and 100.
 
 n.sample <- 10000
-iter.max <- 70*n.sample
+iter.max <- 100*n.sample
 verbose  <- n.sample
 eps.init <- 1
-v <- 10
-beta <- 0.1
+v <- 1
+beta <- 0.2
 
 s <- 0.0001
 
 adaptjump = FALSE
 
-vs <- c(0.5,1,5,10,300)
-betas <- seq(0.1,0.5,by=0.1)
-EP <- matrix(nrow=length(vs),ncol=length(betas))
-KL <- matrix(nrow=length(vs),ncol=length(betas))
-
-for(v_counter in 1:length(vs)){  
-for(beta_counter in 1:length(betas) ){
-
-  v <- vs[v_counter]
-  beta <- betas[beta_counter]
+# vs <- c(0.5,1,5,10,300)
+# betas <- seq(0.1,0.5,by=0.1)
+# EP <- matrix(nrow=length(vs),ncol=length(betas))
+# KL <- matrix(nrow=length(vs),ncol=length(betas))
+# 
+# for(v_counter in 1:length(vs)){  
+# for(beta_counter in 1:length(betas) ){
+# 
+#   v <- vs[v_counter]
+#   beta <- betas[beta_counter]
 
 ## ------------------
 ## Initialization
@@ -287,8 +287,8 @@ while (iter <= iter.max)
 
 # Plotting results:
 
-# plot(entropy.production)
-# points(entropy.production.endorev,col="red")
+plot(entropy.production)
+points(entropy.production.endorev,col="red")
 # 
 # plot(entropy.system)
 
@@ -299,7 +299,7 @@ while (iter <= iter.max)
 # Plot posterior:
 
 plot(f.post, 0,prior_range)
-hist(E[,1], breaks=n.sample/5, freq=FALSE, add=TRUE)
+hist(E[,1], breaks=n.sample/40, freq=FALSE, add=TRUE)
 hist(E.exact, breaks=n.sample/70, freq=FALSE, add=TRUE, col="red")
 legend("topright", c(paste("iter.max =", iter.max),
                      paste("v =",v), 
@@ -312,25 +312,25 @@ legend("topright", c(paste("iter.max =", iter.max),
 
 # KL-divergence to target:
 
-# plot(KL.divergence(E.exact, E[,1], k=50))
-# legend("topright", c(paste("iter.max =", iter.max),
-#                      paste("v =",v), 
-#                      paste("beta =",beta)))
+plot(KL.divergence(E.exact, E[,1], k=50))
+legend("topright", c(paste("iter.max =", iter.max),
+                     paste("v =",v), 
+                     paste("beta =",beta)))
 
 # ratio of rejections:
 
-# accept/iter.max
+accept/iter.max
 
-KL[v_counter,beta_counter] <- KL.divergence(E.exact, E[,1], k=50)[20] 
-
-# total entropy production:
-
-EP[v_counter,beta_counter] <- sum(entropy.production)
-
-}}
+# KL[v_counter,beta_counter] <- KL.divergence(E.exact, E[,1], k=50)[20] 
+# 
+# # total entropy production:
+# 
+# EP[v_counter,beta_counter] <- sum(entropy.production)
+# 
+# }}
 
 # 
-image(KL, col=terrain.colors(30))
+# image(KL, col=terrain.colors(30))
 # 
 # image(EP,col=terrain.colors(40))
 
