@@ -8,14 +8,14 @@ library(MASS)
 library(FNN)
 #library(entropy)
 
-mass_ratio <- 2.5
+mass_ratio <- 10
 
-sigma1 <- .5
-sigma2 <- .1/mass_ratio
+sigma1 <- .1
+sigma2 <- .5/mass_ratio
   
 prior_range <- 3.5
 
-y <- 1
+y <- 0.2
 
 #plot(f.post, 0,prior_range)
 
@@ -101,11 +101,11 @@ loglikeli <- function(x,theta)
 # entropy production for v between 2 and 100.
 
 n.sample <- 10000
-iter.max <- 100*n.sample
+iter.max <- 60*n.sample
 verbose  <- n.sample
-eps.init <- 1
+eps.init <- 0.3
 v <- 1
-beta <- 0.2
+beta <- 0.3
 
 s <- 0.0001
 
@@ -299,8 +299,8 @@ points(entropy.production.endorev,col="red")
 # Plot posterior:
 
 plot(f.post, 0,prior_range)
-hist(E[,1], breaks=n.sample/40, freq=FALSE, add=TRUE)
-hist(E.exact, breaks=n.sample/70, freq=FALSE, add=TRUE, col="red")
+hist(E[,1], breaks=n.sample/70, freq=FALSE, add=TRUE)
+#hist(E.exact, breaks=n.sample/70, freq=FALSE, add=TRUE, col="red")
 legend("topright", c(paste("iter.max =", iter.max),
                      paste("v =",v), 
                      paste("beta =",beta)))
