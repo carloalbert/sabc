@@ -10,14 +10,14 @@ library(poweRlaw)
 
 #library(entropy)
 
-mass_ratio <- 10
+mass_ratio <- 3
 
-sigma1 <- .1
-sigma2 <- .5/mass_ratio
+sigma1 <- .2
+sigma2 <- .2/mass_ratio
   
-prior_range <- 3.5
+prior_range <- 4
 
-y <- 0.2
+y <- 1
 
 #plot(f.post, 0,prior_range)
 
@@ -103,11 +103,11 @@ loglikeli <- function(x,theta)
 # entropy production for v between 2 and 100.
 
 n.sample <- 10000
-iter.max <- 50*n.sample
+iter.max <- 10*n.sample
 verbose  <- n.sample
 eps.init <- 0.3
-v <- 3
-beta <- 0.4
+v <- 100
+Covar.jump <- (0.7)^2
 
 s <- 0.0001
 
@@ -177,17 +177,18 @@ U   <- Rho.mean(eps.init)
 eps <- Schedule(U)
 
 ## Define jump distribution covariance
-Covar.jump <- beta* var(E[,1:dim.par]) + s*diag(1,dim.par)
+#Covar.jump <- beta* var(E[,1:dim.par]) + s*diag(1,dim.par)
 
 ##--------------
 ## Iteration
 ##--------------
 
-# offset
+# asymptotics:
 
 offset <- iter
 
 eps_t <- vector(length=iter.max)
+T_t   <- vector(length=iter.max)
 eps_t_counter <- 1
 
 ## Acceptance counter to determine the resampling step
@@ -265,6 +266,7 @@ while (iter <= iter.max)
       accept <- accept + 1
     }
     eps_t[eps_t_counter] <- eps
+    T_t[eps_t_counter]   <- U
     eps_t_counter <- eps_t_counter + 1
     
   }
@@ -310,12 +312,32 @@ points(entropy.production.endorev,col="red")
 
 # Plot posterior:
 
+# generate sample with temp T=U:
+
+E_test <- matrix(NA, nrow=n.sample, ncol=dim.par+2)
+
+counter <- 0  # Number of accepted particles in E
+
+while(counter < n.sample){
+  
+  ## Generate new particle
+  theta.p <- r.prior()  # Generate a proposal
+  x.p <- r.model(theta.p)
+  u.p <- Phi((x.p - y)^2)  # Calculate distance from target
+  
+  ## Accept with Prob=exp(-u.p/U)
+  if(runif(1) < exp(-u.p / U)){
+    counter <- counter + 1
+    E_test[counter,] <- c(theta.p, rho.p, x.p)
+  }
+}
+
 plot(f.post, 0,prior_range)
-hist(E[,1], breaks=n.sample/30, freq=FALSE, add=TRUE)
-#hist(E.exact, breaks=n.sample/70, freq=FALSE, add=TRUE, col="red")
+hist(E[,1], breaks=n.sample/80, freq=FALSE, add=TRUE)
+hist(E_test[,1], breaks=n.sample/80, freq=FALSE, add=TRUE, col="red")
 legend("topright", c(paste("iter.max =", iter.max),
                      paste("v =",v), 
-                     paste("beta =",beta)))
+                     paste("jump =",sqrt(Covar.jump))))
 
 # Check share of sample points in each hump:
 
@@ -327,29 +349,37 @@ legend("topright", c(paste("iter.max =", iter.max),
 plot(KL.divergence(E.exact, E[,1], k=50))
 legend("topright", c(paste("iter.max =", iter.max),
                      paste("v =",v), 
-                     paste("beta =",beta)))
+                     paste("jump =",sqrt(Covar.jump))))
 
 # ratio of rejections:
 
 accept/iter.max
 
-# plot decay of epsilon:
 
-fn <- function(theta,y,N)
-{
-  sum(((y-theta[2]+theta[1]*log((theta[3]+1):(theta[3]+N))))^2)
-}
-
-plot(eps_t)
-plot((8*offset+1):(8*offset+length(eps_t)),eps_t,log="xy")
-eps_t <- eps_t[which(eps_t != 0)]
-
-optim(par=c(2,24,9*offset),fn=fn,gr=NULL,log(eps_t),length(eps_t))
-
-t <- (149281+1):(149281+length(eps_t))
-plot(t,eps_t,log="xy")
-lines(t,exp(24)*t^{-2.22},col="red")
-
+# # plot decay of temperatures:
+# 
+# fn <- function(theta,y,N)
+# {
+#   sum(((y-theta[2]+theta[1]*log((theta[3]+1):(theta[3]+N))))^2)
+# }
+# 
+# #eps_t_thin <- eps_t[seq(1,length(eps_t),by=500)]
+# #plot(eps_t_thin)
+# 
+# t.s <- T_t[which(T_t != 0)]
+# 
+# t.s <- T_t[-(1:200000)]
+# t.s <- eps_t[-(1:200000)]
+# nn <- 12
+# 
+# plot((nn*offset+1):(nn*offset+length(t.s)),t.s,log="xy")
+# 
+# res <- optim(par=c(2,24,nn*offset),fn=fn,gr=NULL,log(t.s),length(t.s))
+# res
+# 
+# t <- (res$par[3]+1):(res$par[3]+length(t.s))
+# plot(t,t.s,log="xy")
+# lines(t,exp(res$par[2])*t^{-res$par[1]},col="red")
 
 # KL[v_counter,beta_counter] <- KL.divergence(E.exact, E[,1], k=50)[20] 
 # 
