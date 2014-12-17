@@ -1,14 +1,14 @@
-#========================================================
+#===============================================================================
 #
 #  SABC.noninf Algorithm
 #
-#========================================================
+#===============================================================================
 
 ## ARGUMENTS:
 ## f.dist:    Function that either returns a random sample from the likelihood
-##            or the distance between data and such a random sample 
+##            or the distance between data and such a random sample
 ##            The first argument must be the parameter vector.
-## d.prior:   Function that returns the density of the prior distribution 
+## d.prior:   Function that returns the density of the prior distribution
 ## r.prior:   Function which returns one vector of a random realization of the
 ##	          prior distribution.
 ##
@@ -18,302 +18,262 @@
 ## iter.max   maximal number of iterations
 ## v:         tuning parameter
 ## beta:      tuning parameter
-##
-## verbose:   shows the iteration progress each verbose outputs. NULL for no output.
+## delta:     tuning parameter
+## resample   after how many accepted updates?
+## verbose:   shows progress each verbose outputs. Default is 1.
 ## adaptjump: whether to adapt covariance of jump distribution. Default is TRUE.
-## ... :      further arguments passed to f.dist
+## summarystats: defaults to FALSE
+## y:         Data
+## f.summarystats: function for automatic summary statistic
+## ... :      further arguments passed to f.dist, aside of the parameter.
 ##
 ## VALUES:
 ## A list with the following components:
-## E:         matrix with ensemble of samples
-## P:         matrix with prior ensemble of samples
+## E:         matrix with ensemble of samples (row-wise)
+## P:         matrix with prior ensemble of samples (row-wise)
 ## eps:       value of epsilon at final iteration
-## 
+##
 ## -------------------------------------------------------------------
 
-SABC.noninf <- function (f.dist, d.prior, r.prior, n.sample, eps.init, iter.max, 
-                         v, beta, delta, resample, verbose, adaptjump=adaptjump, 
-                         summarystats=summarystats, y=y, f.summarystats=f.summarystats, ...) 
-{
-  
+SABC.noninf <- function (f.dist, d.prior, r.prior,
+                         n.sample, eps.init, iter.max,
+                         v, beta, delta,
+                         resample=n.sample, verbose=1, adaptjump=TRUE,
+                         summarystats=FALSE, y, f.summarystats=NULL, ...){
+  ##---------------------------
   ## Initialize all containers:
   ##---------------------------
-  
+
+  ## Dimension of theta
   dim.par <- length(r.prior())
-  E       <- matrix(NA, nrow=n.sample, ncol=dim.par+1)
-  E.in    <- NULL
-  
-  s <- 0
-  
+
+  ## Ensemble, each row contains a particle (theta,rho)
+  E <- matrix(NA, nrow=n.sample, ncol=dim.par+1)
+
+  ## Global counter which is bounded by iter.max
+  iter <- 0
+
+  ## Small constant for preventing degeneration of covariance matrix
+  s <- 0.0001
+
+
+  ##------------------------
   ## Define a few functions:
   ##------------------------
-  
-  # Define functions for moments of mu:
-  
+
+  ## Define functions for moments of mu:
   Rho.mean <- function(epsilon)
-  {
-    if(epsilon<0) stop("negative epsilon")
-    SS     <-  sum(exp(-P[,dim.par+1]/epsilon))
-    first  <- (sum(exp(-P[,dim.par+1]/epsilon)*P[,dim.par+1]))/SS
-    return(first)
-  }
-  
-  # Define schedule:
-  
+      return( (sum(exp( -P[,dim.par + 1] / epsilon) * P[,dim.par + 1])) /
+               sum(exp( -P[,dim.par + 1] / epsilon)))
+
+  ## Define schedule:
   Schedule <- function(rho)
-  {
-    tmp <- function(epsilon) epsilon^2+v*epsilon^(3/2)-rho^2
-    return(uniroot(tmp,c(0,rho))$root)
-  }
+      return( uniroot(function(epsilon) epsilon^2 + v * epsilon^(3 / 2) - rho^2,
+                      c(0,rho))$root ) #  This v is const*v in (32)
 
-  # Redefinition of metric:
-  
+  ## Redefinition of metric:
   Phi <- function(rho)
-  {
-    sum(rho.old<rho)/N0
-  }
-  
-  f.dist.new <- function(theta,...)
-  {
-    rho <- f.dist(theta,...)
-    return(Phi(rho))
-  }
-  
-  
-  ## ------------------
-  ## 1. initialization
-  ## ------------------
-  
-  ## 1.1 sample initial population
-  
-  if(summarystats)
-  {
-    # Sample from joint prior:
-    
-    dim.f <- length( f.summarystats( f.dist( r.prior(),... ) ) )
-    PP    <- matrix(nrow=3*n.sample, ncol=dim.par + dim.f )       # Prior sample
-    
-    for( i in 1:(3*n.sample) ) 
-    {
-      theta.p <- r.prior()
-      x.p   <- as.numeric( f.summarystats( f.dist(theta.p,... ) ) )
-      PP[i,] <- c( theta.p,x.p ) 
-    }
-    
-    iter <- 3*n.sample        # global counter for likelihood simulations
-    
-    # Linear regression:
-    
-    B  <- matrix( nrow = (dim.f+1), ncol = dim.par)           # Regression parameters
-    XX <- cbind( PP[,(dim.par+1):ncol(PP)],rep(1,n.sample) )
-    BB <- solve( t(XX) %*% XX ) %*% t(XX) 
-    
-    for (i in 1:dim.par)
-    {
-      B[,i] <- (BB %*% PP[,i])#[1:dim.f,]
-    }
-    
-    # Calculate summary stats of data:
-    
-    y_ss <- t(B) %*% as.numeric( c(f.summarystats( y ),1) )
-    
-    # Redefine f.dist:
-    
-    f.dist.old <- f.dist
-    
-    f.dist <- function(par,...)
-    {
-      x_ss <- t(B) %*% as.numeric( c( f.summarystats( f.dist.old( par,... ) ),1 ) )
-      return( sum( ( ( x_ss-y_ss )/y_ss )^2 ) )      
-    }
-    
-    # Redefine prior sample P and initialize E:
-    
-    P <- NULL
-    counter <- 1
-    
-    for( i in 1:(3*n.sample) ) 
-    {
-      theta.p <- PP[i,1:dim.par]
-      v.p     <- -log(d.prior(theta.p))
-      rho.p   <- f.dist(theta.p,... )
-      P <- rbind(P,c(theta.p,rho.p,v.p))
-      if( runif(1) < exp(-rho.p/eps.init) & counter <=n.sample )
-      {
-        E[counter,1:dim.par] <- t(theta.p)
-        E[counter,dim.par+1] <- rho.p
-        E[counter,dim.par+2] <- v.p
-        counter <- counter + 1
-      }
-    }
-    
-    # Add more sample points to E if necessary:
-    
-    while( counter <= n.sample) 
-    {
-      if(iter>iter.max) stop("'iter.max' reached! No initial sample could be generated.")
-      
-      # Propose particle:
-      
-      theta.p <- r.prior()
-      v.p     <- -log(d.prior(theta.p))
-      rho.p   <- f.dist(theta.p,...)
-      
-      # Store particle in prior matrix:
-      
-      P <- rbind(P,c(theta.p,rho.p,v.p))
-      
-      # If close enough to target, store particle in ensemble matrix:
-      
-      if( runif(1) < exp(-rho.p/eps.init) )
-      {
-        E[counter,1:dim.par] <- t(theta.p)
-        E[counter,dim.par+1] <- rho.p
-        E[counter,dim.par+2] <- v.p
-        counter <- counter + 1
-      }
-      iter <- iter + 1
-    }
-    
-  }
-  else
-  {
-    iter <- 1
-    i <- 1
-    
-    while(i<=n.sample) 
-    {
-      theta.p <- r.prior()                # proposal parameter vector
-      rho.p <- f.dist(theta.p,...)
-      iter <- iter+1
-      if(iter>iter.max) stop("'iter.max' reached! No initial sample could be generated.")
-      ## accept with Prob=exp(-rho.p/eps.init)
-      if( runif(1) < exp(-rho.p/eps.init) )
-      {
-        E[i,1:dim.par] <- t(theta.p)
-        E[i,dim.par+1] <- rho.p
-        i <- i+1
-      }
-      else  E.in <- rbind(E.in, c(t(theta.p),rho.p))
-    }
-    P <- rbind(E,E.in)  
-  }
-  
-  N0      <- nrow(P)
-  rho.old <- P[,dim.par+1]
-  
-  # Redefine distances:
+    return(sum(rho.old < rho) / nrow(P))
 
-  E[,dim.par+1] <- apply(as.matrix(E[,dim.par+1]),1,Phi)
-  
-  P[,dim.par+1] <- apply(as.matrix(P[,dim.par+1]),1,Phi)
-  
-  # find initial epsilon_1:
-  
+  f.dist.new <- function(theta, ...)
+    return(Phi(f.dist(theta, ...)))
+
+
+  ## ------------------
+  ## Initialization
+  ## ------------------
+
+  if(summarystats){
+    ## Sample from joint prior:
+    dim.f <- length( f.summarystats( f.dist( r.prior(), ...)))
+    P    <- matrix(nrow = 3 * n.sample, ncol = dim.par + dim.f)
+    for( i in 1:(3 * n.sample)){
+      theta.p <- r.prior()
+      x.p   <- f.summarystats( f.dist(theta.p, ...) )
+      P[i,] <- c(theta.p, x.p)
+    }
+    iter <- 3 * n.sample
+
+    ## Do a linear regression for summary statistics (intercept not used):
+    B  <- matrix( nrow = dim.f, ncol = dim.par)   # Regression parameters
+    for (i in 1:dim.par){
+      fitcoef <- lm(P[,i] ~ P[,(dim.par +1 ):ncol(P)])$coefficients
+      B[,i] <-fitcoef[2:(length(fitcoef))]
+    }
+
+    ## Calculate summary stats of data:
+    y_ss <-  t(B) %*% f.summarystats(y)
+    if(!all(y_ss !=0))
+      stop("summary stat of observation cannot be zero")
+
+    ## Redefine f.dist:
+    f.dist.old <- f.dist
+    f.dist <- function(par, ...){
+      x_ss <- t(B) %*% f.summarystats(f.dist.old( par, ... ))
+      return( sum(((x_ss - y_ss) / y_ss)^2 ))
+    }
+
+    ## Redefine prior sample P and initialize E:
+    counter <- 0  # Number of particles in E
+    for(i in 1:(3*n.sample)){
+      theta.p <- P[i,1:dim.par]
+      rho.p   <- f.dist(theta.p, ...)
+      P[i,] <- c(theta.p,rho.p,rep(0,dim.f-1))  # Only rho counts
+      if( runif(1) < exp(-rho.p / eps.init) && counter < n.sample ){
+        counter <- counter + 1
+        E[counter,] <- c(theta.p,rho.p)
+
+      }
+    }
+    P <- P[,1:(dim.par+1)]  # Drop 0s columns because distance has one dimension
+
+    ## Add more sample points to E if necessary:
+    while(counter < n.sample){
+      ## Show progress:
+      if(!is.null(verbose) && iter %% verbose == 0)
+        cat('updates' , iter / iter.max * 100, '% \n')
+
+      ## Check if we reached maximum number of likelihood evaluations
+      iter <- iter + 1
+      if(iter>iter.max)
+          stop("'iter.max' reached! No initial sample could be generated.")
+
+      ## Generate new particle
+      theta.p <- r.prior()  # Generate a proposal
+      rho.p <- f.dist(theta.p, ...)  # Calculate distance from target
+
+      ## Accept with Prob=exp(-rho.p/eps.init)
+      if(runif(1) < exp(-rho.p / eps.init)){
+        counter <- counter+1
+        E[counter,] <- c(theta.p, rho.p)
+      }
+
+      ## Add to P and increase its size if full (dynamically)
+      if(iter > nrow(P))
+          P <- rbind(P,matrix(NA, nrow=n.sample, ncol=dim.par + 1))
+      P[iter,1:dim.par] <- c(theta.p, rho.p)
+    }
+    ## Remove empty rows of P due to dynamic allocation
+    P <- P[1:iter,]
+
+  } else {  # No summarystats...
+    ## Create matrix of rejected and accepted particles,
+    ## dynamic increasing of nrow
+    P <- matrix(NA, nrow=2*n.sample, ncol=dim.par+1)
+
+    counter <- 0  # Number of accepted particles in E
+    while(counter < n.sample){
+      ## Show progress:
+      if(!is.null(verbose) && iter %% verbose == 0)
+        cat('Likelihoods calls ' , iter/iter.max*100, '% \n')
+
+      ## Check if we reached maximum number of likelihood evaluations
+      iter <- iter + 1
+      if(iter > iter.max)
+          stop("'iter.max' reached! No initial sample could be generated.")
+
+      ## Generate new particle
+      theta.p <- r.prior()  # Generate a proposal
+      rho.p <- f.dist(theta.p, ...)  # Calculate distance from target
+
+      ## Accept with Prob=exp(-rho.p/eps.init)
+      if(runif(1) < exp(-rho.p / eps.init)){
+        counter <- counter + 1
+        E[counter,] <- c(theta.p, rho.p)
+      }
+
+      ## Add to P and increase its size if full
+      if(iter > nrow(P))
+          P <- rbind(P, matrix(NA, nrow=n.sample, ncol=dim.par + 1))
+      P[iter,] <- c(theta.p, rho.p)
+    }
+
+    ## Remove empty rows of P due to dynamic allocation
+    P <- P[1:iter,]
+  }
+
+  ## Distances in old metric
+  rho.old <- P[,dim.par + 1]
+
+  ## Define distances in new metric
+  E[,dim.par+1] <- sapply(E[,dim.par+1], Phi, simplify=TRUE)
+  P[,dim.par+1] <- sapply(P[,dim.par+1], Phi, simplify=TRUE)
+
+  ## Find initial epsilon_1:
   U   <- Rho.mean(eps.init)
   eps <- Schedule(U)
-  
-  # Define jump distribution:
-  
+
+  ## Define jump distribution covariance
   Covar.jump <- beta* var(E[,1:dim.par]) + s*diag(1,dim.par)
-  
+
   ##--------------
-  ## 2. iteration
+  ## Iteration
   ##--------------
-  
-  a  <- 0       # acceptance counter
-  kk <- 1       # iteration  counter
-  
-  while (kk < (iter.max-iter) )
-  {
-    # Show progress:
-    
-    if(!is.null(verbose) && kk %% verbose == 0)  
-    {
-      cat('updates' , (kk+iter)/n.sample, '\t',
-          'eps '  , eps, '\t', 
-          'u.mean'  , U, '\n'
-          )
-      a <- 0
+
+  ## Acceptance counter to determine the resampling step
+  accept  <- 0
+  while (iter <= iter.max){
+    for(i in 1:verbose){
+      ## Select one arbitrary particle:
+      index <- sample(1:n.sample, 1)
+
+      ## Sample proposal parameter and calculate new distance:
+      theta.p <- E[index,1:dim.par] +
+                 mvrnorm(1, mu=rep(0, dim.par), Sigma=Covar.jump)
+      rho.p   <- f.dist.new(theta.p, ...)
+      if(is.na(rho.p))
+          next()
+      ## Calculate acceptance probability:
+      prior.prob  <- d.prior(theta.p) / d.prior(E[index,1:dim.par])
+      likeli.prob <- exp((E[index,dim.par+1] - rho.p) / eps)
+
+      ## If accepted
+      if(runif(1) < prior.prob * likeli.prob){
+        ## Update E
+        E[index,] <- c(theta.p, rho.p)
+
+        ## Optionally: Update jump distribution covariance
+        if(adaptjump)
+            Covar.jump <- beta * var(E[,1:dim.par]) + s * diag(1,dim.par)
+
+        ## Update U:
+        U  <- mean(E[,dim.par + 1])
+
+        ## Update epsilon:
+        eps <- Schedule(U)
+
+        ## Increment acceptance counter:
+        accept <- accept + 1
+      }
     }
-    
-    # Select one arbitrary particle:
-    
-    index <- sample(1:n.sample,1)
-    
-    # Sample proposal parameter and calculate new distance:
-    
-    theta.p <- E[index,1:dim.par] + mvrnorm(1, mu=rep(0, dim.par), Sigma=Covar.jump)
-    rho.p   <- f.dist.new(theta.p,...)
-        
-    # Calculate acceptance probability:
-    
-    prior.prob  <- d.prior(theta.p) / d.prior(E[index,1:dim.par])
-    likeli.prob <- exp((E[index,dim.par+1] - rho.p)/eps)
-    Prob.accept <- min(1, prior.prob * likeli.prob)
-    
-    # If accepted:
-    
-    if(runif(1)<Prob.accept) 
-    {
-      # Update E:
-      
-      E[index,1:dim.par] <- theta.p
-      E[index,dim.par+1] <- rho.p
-      
-      # Optionally: Update jump distribution:
-      
-      if(adaptjump) Covar.jump <- beta*var(E[,1:dim.par]) + s*diag(1,dim.par)
-      
-      # Update U:
-      
-      U  <- mean(E[,dim.par+1])
-      
-      # Update epsilon:
-      
+    iter <- iter + verbose
+    ## Show progress:
+    cat('updates' , iter / iter.max * 100, '% \t',
+        'eps '  , eps, '\t',
+        'u.mean'  , U, '\n')
+
+    ## Resampling
+    if(accept >= resample){
+      ## Weighted resampling:
+      w <- exp(-E[,dim.par + 1] * delta / eps)
+      w <- w/sum(w)
+      index.resampled <- sample(1:n.sample, n.sample, replace=TRUE, prob=w)
+      E <- E[index.resampled,]
+
+      ## Update U and epsilon:
+      eps <- eps * (1 - delta)
+      U <- mean(E[,dim.par + 1])
       eps <- Schedule(U)
-      
-      # increment acceptance counter:
-      
-      a <- a+1
-    }
-    
-    ## 2.5 resampling
-    
-    if(a == resample)
-    {
-      # weighted resampling:
-      
-      w         <- exp(-E[,dim.par+1]*delta/eps)
-      w         <- w/sum(w)
-      index     <- sample(1:n.sample, n.sample, replace=TRUE, prob=w)
-      E         <- E[index,, drop=FALSE]
-      
-      # Update U and epsilon:
-      
-      eps     <- eps*(1-delta)
-      U       <- mean(E[,dim.par+1])
-      
-      # Update equilibrium epsilon:
-      
-      eps <- Schedule(U)
-      
-      ## print effective sampling size
+
+      ## Print effective sampling size TODO: sense of summing over these weights?
       cat("Resampling. Effective sampling size: ", 1/sum((w/sum(w))^2), "\n")
-      
-      ## update covariance
-      Covar <- var(E[,1:dim.par])
-      a <- 0
+      accept <- 0
     }
-    
-    kk <- kk+1
-
   }
-  
-  #--------
-  # Output
-  #--------
-  
-  return( list( E=E, P=P, eps=eps ) )  
 
+  ##--------
+  ## Output
+  ##--------
+
+  return(list( E=E, P=P, eps=eps))
 }
