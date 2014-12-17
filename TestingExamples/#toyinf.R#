@@ -3,22 +3,22 @@
 y <- 0.1
 n.sample <- 200
 eps.init <- 2
-iter.max <- 50000
+iter.max <- 1000
 v <- 0.001
 beta <- 2
 resample <- 3*n.sample
 delta <- 0.1
-method <- "noninformative"
+method <- "informative"
 adaptjump <- TRUE
 summarystats <- FALSE
 f.summarystats <- NULL
 
 ##prior is uniform on [-10,10]
 d.prior <- function(par)
-    return(ifelse( -10 <= par && par <= 10 , 0.05 , 0))
+    return(dnorm(par,0,1))
 
 r.prior <- function()
-    return(( runif(1)-0.5)*20)
+    return(rnorm(1,0,1))
 
 ##Model is sum of two normal random variables
 r.model <- function(par)
@@ -28,7 +28,7 @@ r.model <- function(par)
 
 ##run SABC
 source("../SABC/R/SABC.R")
-source("../SABC/R/SABC.noninf.r")
+source("../SABC/R/SABC.inf.r")
 SABC.res <- SABC(
   r.model       = r.model,
   r.prior       = r.prior,
