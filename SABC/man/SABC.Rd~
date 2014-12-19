@@ -62,7 +62,7 @@ Returns a list with the following components:
 }
 
 \references{
-C. Albert, H. R. Kuensch and A. Scheidegger,  arXiv:1208.2157 (2014), \emph{A Simulated Annealing Approach to Approximate Bayes Computations}.
+C. Albert, H. R. Kuensch and A. Scheidegger, Statistics and Computing 0960-3174 (2014),  arXiv:1208.2157, \emph{A Simulated Annealing Approach to Approximate Bayes Computations}.
 
 
 P. Fearnhead and D. Prangle, J. R. Statist. Soc. B  74 (2012), \emph{Constructing summary statistics for approximate Bayesian computation: semi-automatic approximate Bayesian computation}.}
@@ -92,4 +92,6 @@ res <- SABC(f.dist,r.prior,d.prior,n.sample,eps.init,iter.max)
 
 # Histogram of results
 hist(res$E,breaks=200)
+
+
 }
