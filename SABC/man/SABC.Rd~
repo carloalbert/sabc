@@ -87,11 +87,12 @@ n.sample <- 1000
 eps.init <- 2
 iter.max <- 40*n.sample
 
+\dontrun{
 # Run algorithm ("noninformative" case)
-res <- SABC(f.dist,r.prior,d.prior,n.sample,eps.init,iter.max)
 
+res <- SABC(f.dist,r.prior,d.prior,n.sample,eps.init,iter.max)
 # Histogram of results
 hist(res$E,breaks=200)
-
+}
 
 }
