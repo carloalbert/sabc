@@ -151,7 +151,7 @@ SABC.noninf <- function (f.dist, d.prior, r.prior,
       ## Add to P and increase its size if full (dynamically)
       if(iter > nrow(P))
           P <- rbind(P,matrix(NA, nrow=n.sample, ncol=dim.par + 1))
-      P[iter,1:dim.par] <- c(theta.p, rho.p)
+      P[iter,1:(dim.par+1)] <- c(theta.p, rho.p)
     }
     ## Remove empty rows of P due to dynamic allocation
     P <- P[1:iter,]
