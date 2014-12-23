@@ -62,7 +62,7 @@ beta      <- 0.8           # Tuning parameter governing mixing in parameter spac
 resample  <- 2000 #n.sample    # Number of succesful iterations after which a resampling is performed
 delta     <- 0.1           # Tuning parameter for the resampling steps
 adaptjump    <- TRUE               # jump distribution is adapted
-summarystats <- FALSE               # Semi-automatic summary stats are used
+summarystats <- TRUE               # Semi-automatic summary stats are used
 
 r.modeldistance <- function(theta){
     if (theta[1]<Kmax && theta[1]>Kmin  && theta[2] > Sigmamin &&
@@ -86,14 +86,18 @@ r.model<- function(theta){
 
 ## Do a synthetic study. This is the "observation"
 y <- r.model(c(Ktrue,Sigmatrue))
-truevalue <- f.summarystats(y)
+
 
 
 
 method       <- "noninformative"
 
+f.summarystats <- function(x){
+    return(c(x,x^2))
+}
+
 try(resnon <- SABC(
-    r.model       = r.modeldistance,
+    r.model       = r.model,
     r.prior       = r.prior,
     d.prior       = d.prior,
     n.sample      = n.sample,
@@ -107,34 +111,10 @@ try(resnon <- SABC(
     method        = method,
     adaptjump     = adaptjump,
     summarystats  = summarystats,
-    y             = NULL,
-    f.summarystats = FALSE
+    y             = y,
+    f.summarystats = f.summarystats
 ))
 
 hist(resnon$E[,1],breaks=20)
 hist(resnon$E[,2],breaks=20)
-
-
-method       <- "informative"
-
-try(resnon <- SABC(
-    r.model       = r.modeldistance,
-    r.prior       = r.prior,
-    d.prior       = d.prior,
-    n.sample      = n.sample,
-    eps.init      = eps.init,
-    iter.max      = iter.max,
-    v             = v,
-    beta          = beta,
-    delta         = delta,
-    resample      = resample,
-    verbose       = n.sample,
-    method        = method,
-    adaptjump     = adaptjump,
-    summarystats  = summarystats,
-    y             = NULL,
-    f.summarystats = FALSE
-))
-
-
 

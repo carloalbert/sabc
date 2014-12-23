@@ -76,13 +76,13 @@ Carlo Albert <carlo.albert@eawag.ch>. Package initially compiled by Lukas M. Web
 ## Example for "noninformative" case
 # Prior is uniform on [-10,10]
 d.prior <- function(par)
-    dunif(par,-10,10) 
+    dunif(par,-10,10)
 r.prior <- function()
     runif(1,-10,10)
 
-# Model is the sum of two normal random variables. Return distance to observation 0:
+# Model is the sum of two normal distributions. Return distance to observation 0:
 f.dist <- function(par)
-    return( abs(rnorm( 1 , 2*par , 1+0.1 ) ))
+    return( abs(rnorm( 1 , par , ifelse(runif(1)<0.5,1,0.1 ) )))
 
 # Run algorithm ("noninformative" case)
 res <- SABC(f.dist,r.prior,d.prior,n.sample=500,eps.init=2,iter.max=30000)

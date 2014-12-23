@@ -226,9 +226,10 @@ SABC.noninf <- function (f.dist, d.prior, r.prior,
       ## Calculate acceptance probability:
       prior.prob  <- d.prior(theta.p) / d.prior(E[index,1:dim.par])
       likeli.prob <- exp((E[index,dim.par+1] - rho.p) / eps)
+      accept.prob <- prior.prob * likeli.prob
 
       ## If accepted
-      if(runif(1) < prior.prob * likeli.prob){
+      if(runif(1) < ifelse(!is.na(accept.prob),accept.prob,0) ){
         ## Update E
         E[index,] <- c(theta.p, rho.p)
 
