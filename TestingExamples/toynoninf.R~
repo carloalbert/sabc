@@ -8,7 +8,7 @@ v <- 0.001
 beta <- 2
 resample <- 3*n.sample
 delta <- 0.1
-method <- "informative"
+method <- "noninformative"
 adaptjump <- TRUE
 summarystats <- FALSE
 f.summarystats <- NULL
@@ -29,9 +29,6 @@ r.model <- function(par)
 ##run SABC
 source("../SABC/R/SABC.R")
 source("../SABC/R/SABC.noninf.r")
-source("../SABC/R/SABC.inf.r")
-library(MASS)
-library(tensorA)
 SABC.res <- SABC(
   r.model       = r.model,
   r.prior       = r.prior,

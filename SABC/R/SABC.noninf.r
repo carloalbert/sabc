@@ -266,7 +266,7 @@ SABC.noninf <- function (f.dist, d.prior, r.prior,
       U <- mean(E[,dim.par + 1])
       eps <- Schedule(U)
 
-      ## Print effective sampling size TODO: sense of summing over these weights?
+      ## Print effective sampling size
       cat("Resampling. Effective sampling size: ", 1/sum((w/sum(w))^2), "\n")
       accept <- 0
     }
