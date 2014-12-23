@@ -4,10 +4,6 @@ Title: Simulated annealing approach to Approximate Bayesian Computation
 Description: Algorithms for the simulated annealing approach to Approximate Bayesian Computation (SABC)
 Version: 0.92
 Date: 2014-12-23
-Authors@R: c(person("Carlo", "Albert", role = "aut",
-		     email = "carlo.albert@eawag.ch"),
-	      person("Andreas", "Scheidegger", role = "aut"),
-	      person("Tobia", "Fasciati", role = "ctb"))
 Author: Carlo Albert, Andreas Scheidegger, Tobia Fasciati, Lukas M. Weber.
 Maintainer: Carlo Albert <carlo.albert@eawag.ch>
 Imports: MASS, tensorA
