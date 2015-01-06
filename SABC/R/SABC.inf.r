@@ -317,12 +317,18 @@ SABC.inf <- function(f.dist, d.prior, r.prior, n.sample, eps.init, iter.max,
   tmp      <- Vectorize(function(epsilon) abs(as.numeric(ESS(epsilon,0))-50))
   eps.crit <- optimize(tmp,c(0,0.5))$minimum
 
-  # Catch an error
+  # Catch an error and jump to noninformative case
   Cov.uv <- cov(E[,(dim.par+1):(dim.par+2)])
   if (class(try(solve(Cov.uv),TRUE)) == "try-error"){
-      stop("Impossible to solve equation (49) in (Albert et al.). Try using noninformative case.")
+      warning("Impossible to solve equation (49) in (Albert et al.).
+               A possible reason is a flat prior. Using the noninformative case.")
+      res <- SABC.noninf(f.dist, d.prior, r.prior, n.sample, eps.init,
+                         iter.max, v, beta, delta, resample, verbose,
+                         adaptjump, summarystats, y, f.summarystats, ...)
+      return(res)
   }
 
+  print("hi")
 
   ##--------------
   ## 2. iteration
