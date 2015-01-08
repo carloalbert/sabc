@@ -1,0 +1,9 @@
+packaging is done by:
+R CMD build SABC
+
+testing is done by:
+R CMD check --as-cran SABC
+
+to change EOL from windows to linux, use e.g.:
+find . -not -type d -exec file "{}" ";" | grep CRLF
+fromdos SABC/R/SABC.noninf.r
