@@ -108,15 +108,35 @@ res <- SABC(
             y             = NULL,
             f.summarystats = FALSE
     )
-par(mfrow=c(2,1))
-hist(res$E[,1],breaks=50,xlim=c(-1,0.5),main="ABC,K")
-hist(res$E[,2],breaks=50,xlim=c(0,1),,main="ABC,Sigma")
+par(mfrow=c(2,8))
+hist(res$E[,1],breaks=50,xlim=c(-1,0.5),main="noninf,noSS,K")
+hist(res$E[,2],breaks=50,xlim=c(0,1),,main="noninf,noSS,Sigma")
 
 
 
 ## PART 2 noninformative with summarystats
 summarystats <- TRUE
 method       <- "noninformative"
+res <- SABC(
+            r.model       = r.model,
+            r.prior       = r.prior,
+            d.prior       = d.prior,
+            n.sample      = n.sample,
+            eps.init      = eps.init,
+            iter.max      = iter.max,
+            v             = v,
+            beta          = beta,
+            delta         = delta,
+            resample      = resample,
+            verbose       = n.sample,
+            method        = method,
+            adaptjump     = adaptjump,
+            summarystats  = summarystats,
+            y             = y,
+            f.summarystats = FALSE
+    )
+hist(res$E[,1],breaks=50,xlim=c(-1,0.5),main="noninf,yesSS,K")
+hist(res$E[,2],breaks=50,xlim=c(0,1),,main="noninf,yesSS,Sigma")
 
 
 ## PART 3 informative without summarystats
@@ -140,11 +160,33 @@ res <- SABC(
             y             = NULL,
             f.summarystats = FALSE
     )
-par(mfrow=c(2,1))
-hist(as.matrix(res$E)[,1],breaks=50,xlim=c(-1,0.5),main="ABC,K")
-hist(as.matrix(res$E)[,2],breaks=50,xlim=c(0,1),,main="ABC,Sigma")
+
+hist(as.matrix(res$E)[,1],breaks=50,xlim=c(-1,0.5),main="inf,noSS,K")
+hist(as.matrix(res$E)[,2],breaks=50,xlim=c(0,1),,main="inf,noSS,Sigma")
 
 
 ## PART 4 informative with summarystats
+
 summarystats <- TRUE
 method       <- "informative"
+res <- SABC(
+            r.model       = r.model,
+            r.prior       = r.priorinf,
+            d.prior       = d.priorinf,
+            n.sample      = n.sample,
+            eps.init      = eps.init,
+            iter.max      = iter.max,
+            v             = v,
+            beta          = beta,
+            delta         = delta,
+            resample      = resample,
+            verbose       = n.sample,
+            method        = method,
+            adaptjump     = adaptjump,
+            summarystats  = summarystats,
+            y             = y,
+            f.summarystats = FALSE
+    )
+
+hist(as.matrix(res$E)[,1],breaks=50,xlim=c(-1,0.5),main="inf,noSS,K")
+hist(as.matrix(res$E)[,2],breaks=50,xlim=c(0,1),,main="inf,noSS,Sigma")
