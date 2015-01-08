@@ -218,8 +218,6 @@ SABC.noninf <- function (f.dist, d.prior, r.prior,
       theta.p <- E[index,1:dim.par] +
                  mvrnorm(1, mu=rep(0, dim.par), Sigma=Covar.jump)
       rho.p   <- f.dist.new(theta.p, ...)
-      if(is.na(rho.p))
-          next()
 
       ## Calculate acceptance probability:
       prior.prob  <- d.prior(theta.p) / d.prior(E[index,1:dim.par])
@@ -256,8 +254,7 @@ SABC.noninf <- function (f.dist, d.prior, r.prior,
     ## Resampling
     if(accept >= resample){
       ## Weighted resampling:
-      if(eps==0) w=rep(1,length(w))
-      else w <- exp(-E[,dim.par + 1] * delta / eps)
+      w <- exp(-E[,dim.par + 1] * delta / U)
       w <- w/sum(w)
       index.resampled <- sample(1:n.sample, n.sample, replace=TRUE, prob=w)
       E <- E[index.resampled,]
