@@ -68,7 +68,7 @@ C. Albert, H. R. Kuensch and A. Scheidegger, Statistics and Computing 0960-3174 
 P. Fearnhead and D. Prangle, J. R. Statist. Soc. B  74 (2012), \emph{Constructing summary statistics for approximate Bayesian computation: semi-automatic approximate Bayesian computation}.}
 
 \author{
-Carlo Albert <carlo.albert@eawag.ch>. Package initially compiled by Lukas M. Weber.
+Carlo Albert <carlo.albert@eawag.ch>, Andreas Scheidegger, Tobia Fasciati. Package initially compiled by Lukas M. Weber.
 }
 
 \examples{
