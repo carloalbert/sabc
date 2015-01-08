@@ -48,7 +48,7 @@ SABC.inf <- function(f.dist, d.prior, r.prior, n.sample, eps.init, iter.max,
   P <- NULL                                                  # joint prior sample
 
   s <- 0
-  a.force <- 6
+  a.force <- 6  # factor a in eq. (51) in Albert et al 2014
 
   ## Define functions:
   ##------------------
@@ -148,48 +148,56 @@ SABC.inf <- function(f.dist, d.prior, r.prior, n.sample, eps.init, iter.max,
     # Sample from joint prior:
 
     dim.f <- length( f.summarystats( f.dist( r.prior(),... ) ) )
-    PP    <- matrix(nrow=4*n.sample, ncol=dim.par + dim.f )       # Prior sample
+    PP    <- matrix(nrow=3*n.sample, ncol=dim.par + dim.f )       # Prior sample
 
-    for( i in 1:(4*n.sample) )
+    for( i in 1:(3*n.sample) )
     {
       theta.p <- r.prior()
       x.p   <- as.numeric( f.summarystats( f.dist(theta.p,... ) ) )
       PP[i,] <- c( theta.p,x.p )
     }
 
-    iter <- 4*n.sample        # global counter for likelihood simulations
+    iter <- 3*n.sample        # global counter for likelihood simulations
 
     # Linear regression:
 
-    B  <- matrix( nrow = (dim.f+1), ncol = dim.par)           # Regression parameters
+    B  <- matrix( nrow = (dim.f), ncol = dim.par)           # Regression parameters
     XX <- cbind( PP[,(dim.par+1):ncol(PP)],rep(1,n.sample) )
     BB <- solve( t(XX) %*% XX ) %*% t(XX)
 
     for (i in 1:dim.par)
     {
-      B[,i] <- (BB %*% PP[,i])#[1:dim.f,]
+      B[,i] <- (BB %*% PP[,i])[1:dim.f,]
     }
 
     # Calculate summary stats of data:
 
-    y_ss <- t(B) %*% as.numeric( c(f.summarystats( y ),1) )
-
+    y_ss <- t(B) %*% as.numeric( f.summarystats( y ) )
+    
     # Redefine f.dist:
 
     f.dist.old <- f.dist
-
-    f.dist <- function(par,...)
-    {
-      x_ss <- t(B) %*% as.numeric( c( f.summarystats( f.dist.old( par,... ) ),1 ) )
-      return( sum( ( ( x_ss-y_ss )/y_ss )^2 ) )
-    }
+  
+    if(!all(y_ss !=0))
+      f.dist <- function(par,...)
+      {
+        x_ss <- t(B) %*% as.numeric( f.summarystats( f.dist.old( par,... ) ) )
+        return( sum( ( x_ss-y_ss )^2 ) ) 
+      }
+    else
+      f.dist <- function(par,...)
+      {
+        x_ss <- t(B) %*% as.numeric( f.summarystats( f.dist.old( par,... ) ) )
+        return( sum( ( ( x_ss-y_ss )/y_ss )^2 ) )
+      }
+      
 
     # Redefine prior sample P and initialize E:
 
     P <- NULL
     counter <- 1
 
-    for( i in 1:(4*n.sample) )
+    for( i in 1:(3*n.sample) )
     {
       theta.p <- PP[i,1:dim.par]
       v.p     <- -log(d.prior(theta.p))
@@ -320,15 +328,12 @@ SABC.inf <- function(f.dist, d.prior, r.prior, n.sample, eps.init, iter.max,
   # Catch an error and jump to noninformative case
   Cov.uv <- cov(E[,(dim.par+1):(dim.par+2)])
   if (class(try(solve(Cov.uv),TRUE)) == "try-error"){
-      warning("Impossible to solve equation (49) in (Albert et al.).
-               A possible reason is a flat prior. Using the noninformative case.")
+      warning("Flat prior; method 'uninformative' was used instead!")
       res <- SABC.noninf(f.dist, d.prior, r.prior, n.sample, eps.init,
                          iter.max, v, beta, delta, resample, verbose,
                          adaptjump, summarystats, y, f.summarystats, ...)
       return(res)
   }
-
-  print("hi")
 
   ##--------------
   ## 2. iteration

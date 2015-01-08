@@ -31,11 +31,18 @@ SABC <- function(r.model, r.prior, d.prior,
   
   if( !summarystats & !is.null(y) )
   {
-    f.dist <- function(par,...)
-    {
-      x <- r.model(par,...)
-      return(sum((x-y)/y)^2)
-    }
+    if(!all(y !=0))
+      f.dist <- function(par,...)
+      {
+        x <- r.model(par,...)
+        return(sum((x-y)^2))
+      }
+    else
+      f.dist <- function(par,...)
+      {
+        x <- r.model(par,...)
+        return(sum((x-y)/y)^2)
+      }
   }
   
   if( !summarystats & is.null(y) & length( r.model( r.prior(),... ) )>1 )
@@ -43,8 +50,9 @@ SABC <- function(r.model, r.prior, d.prior,
       stop("r.model needs to return distance to data or data vector y needs to be provided!")
   }
   
+  if(summarystats & is.null(y)) stop("data vector y needs to be provided!")
   if(summarystats & is.null(f.summarystats) )
-    f.summarystats <- function(x) return(c(y,y^2,y^3))
+    f.summarystats <- function(x) return(c(x,x^2,x^3))
   
   if (method == "noninformative" | method == "noninf" | method == "non") {
     SABC.noninf(f.dist=f.dist, d.prior=d.prior, r.prior=r.prior, 

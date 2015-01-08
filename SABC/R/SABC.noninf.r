@@ -63,8 +63,8 @@ SABC.noninf <- function (f.dist, d.prior, r.prior,
 
   ## Define functions for moments of mu:
   Rho.mean <- function(epsilon)
-      return( (sum(exp( -P[,dim.par + 1] / epsilon) * P[,dim.par + 1])) /
-               sum(exp( -P[,dim.par + 1] / epsilon)))
+      return( ifelse(epsilon==0,0,(sum(exp( -P[,dim.par + 1] / epsilon) * P[,dim.par + 1])) /
+               sum(exp( -P[,dim.par + 1] / epsilon))))
 
   ## Define schedule:
   Schedule <- function(rho)
@@ -103,11 +103,15 @@ SABC.noninf <- function (f.dist, d.prior, r.prior,
 
     ## Calculate summary stats of data:
     y_ss <-  t(B) %*% f.summarystats(y)
-    if(!all(y_ss !=0))
-      stop("summary stat of observation cannot be zero")
 
     ## Redefine f.dist:
     f.dist.old <- f.dist
+    if(!all(y_ss !=0))
+      f.dist <- function(par, ...){
+        x_ss <- t(B) %*% f.summarystats(f.dist.old( par, ... ))
+        return( sum((x_ss - y_ss)^2 ))
+      }
+    else
     f.dist <- function(par, ...){
       x_ss <- t(B) %*% f.summarystats(f.dist.old( par, ... ))
       return( sum(((x_ss - y_ss) / y_ss)^2 ))
@@ -116,22 +120,18 @@ SABC.noninf <- function (f.dist, d.prior, r.prior,
     ## Redefine prior sample P and initialize E:
     counter <- 0  # Number of particles in E
     for(i in 1:(3*n.sample)){
-      theta.p <- P[i,1:dim.par]
-      rho.p   <- f.dist(theta.p, ...)
-      P[i,] <- c(theta.p,rho.p,rep(0,dim.f-1))  # Only rho counts
+      x_ss <- t(B) %*% P[i,(dim.par+1):ncol(P)]
+      rho.p   <- ifelse(!all(y_ss !=0) ,  sum((x_ss-y_ss)^2) , sum(((x_ss-y_ss)/y_ss)^2 ))
+      P[i,(dim.par+1)] <- rho.p
       if( runif(1) < exp(-rho.p / eps.init) && counter < n.sample ){
         counter <- counter + 1
-        E[counter,] <- c(theta.p,rho.p)
-
+        E[counter,] <- c(P[i,1:dim.par],rho.p)
       }
     }
-    P <- P[,1:(dim.par+1)]  # Drop 0s columns because distance has one dimension
+    P <- P[,1:(dim.par+1)]  # cut-off part of P that is no longer needed
 
     ## Add more sample points to E if necessary:
     while(counter < n.sample){
-      ## Show progress:
-      if(!is.null(verbose) && iter %% verbose == 0)
-        cat('updates' , iter / iter.max * 100, '% \n')
 
       ## Check if we reached maximum number of likelihood evaluations
       iter <- iter + 1
@@ -163,9 +163,6 @@ SABC.noninf <- function (f.dist, d.prior, r.prior,
 
     counter <- 0  # Number of accepted particles in E
     while(counter < n.sample){
-      ## Show progress:
-      if(!is.null(verbose) && iter %% verbose == 0)
-        cat('Likelihoods calls ' , iter/iter.max*100, '% \n')
 
       ## Check if we reached maximum number of likelihood evaluations
       iter <- iter + 1
@@ -259,7 +256,8 @@ SABC.noninf <- function (f.dist, d.prior, r.prior,
     ## Resampling
     if(accept >= resample){
       ## Weighted resampling:
-      w <- exp(-E[,dim.par + 1] * delta / eps)
+      if(eps==0) w=rep(1,length(w))
+      else w <- exp(-E[,dim.par + 1] * delta / eps)
       w <- w/sum(w)
       index.resampled <- sample(1:n.sample, n.sample, replace=TRUE, prob=w)
       E <- E[index.resampled,]

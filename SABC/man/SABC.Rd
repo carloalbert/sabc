@@ -85,9 +85,9 @@ f.dist <- function(par)
     return( abs(rnorm( 1 , par , ifelse(runif(1)<0.5,1,0.1 ) )))
 
 # Run algorithm ("noninformative" case)
-res <- SABC(f.dist,r.prior,d.prior,n.sample=500,eps.init=2,iter.max=30000)
+res <- SABC(f.dist,r.prior,d.prior,n.sample=500,eps.init=2,iter.max=50000)
 
 # Histogram of results
-hist(res$E,breaks=200)
+hist(res$E[,1],breaks=200)
 }
 }
