@@ -1,5 +1,5 @@
 # sabc
-The SABC package is an R implementation of the Approximate Bayesian Computations algorithm presented in [1].
+The SABC package is an R implementation of the Approximate Bayes Computations algorithm presented in [1].
 
 To install, you need to take the following steps:
 
@@ -19,7 +19,8 @@ and then install SABC with
 
 > ?SABC
 
-[1]  C. Albert, H. R. Kuensch and A. Scheidegger, Statistics and
-     Computing 0960-3174 (2014), arXiv:1208.2157, A Simulated
-     Annealing Approach to Approximate Bayes Computations_.
+[1]  C. Albert, H. R. Kuensch and A. Scheidegger. A Simulated Annealing Approach to Approximate Bayes Computations.
+     Statistics and Computing 0960-3174 (2014).
+     http://dx.doi.org/10.1007/s11222-014-9507-8 
+     http://arxiv.org/abs/1208.2157
 
