@@ -9,11 +9,14 @@ on which distribution of R you are using (which can be found via session_info() 
 
 2) Start a new R session, load the package devtools with 
 > library(devtools)
+
 and then install SABC with
+
 > install_github("carloalbert/sabc",subdir="SABC")
 
 3) Load SABC and read the help file
 > library(SABC)
+
 > ?SABC
 
 [1]  C. Albert, H. R. Kuensch and A. Scheidegger, Statistics and
