@@ -2,7 +2,7 @@ Package: SABC
 Title: Simulated annealing approach to Approximate Bayesian Computation
         (SABC)
 Description: Algorithms for the simulated annealing approach to Approximate Bayesian Computation (SABC)
-Version: 0.92
+Version: 0.93
 Date: 2014-12-23
 Author: Carlo Albert, Andreas Scheidegger, Tobia Fasciati, Lukas M. Weber.
 Maintainer: Carlo Albert <carlo.albert@eawag.ch>

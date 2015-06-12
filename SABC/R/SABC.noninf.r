@@ -68,8 +68,8 @@ SABC.noninf <- function (f.dist, d.prior, r.prior,
 
   ## Define schedule:
   Schedule <- function(rho)
-      return( uniroot(function(epsilon) epsilon^2 + v * epsilon^(3 / 2) - rho^2,
-                      c(0,rho))$root ) #  This v is const*v in (32)
+      return( ifelse( rho < 1e-100, 0 ,uniroot(function(epsilon) epsilon^2 + v * epsilon^(3 / 2) - rho^2,
+                      c(0,rho))$root )) #  This v is const*v in (32)
 
   ## Redefinition of metric:
   Phi <- function(rho)
@@ -252,7 +252,7 @@ SABC.noninf <- function (f.dist, d.prior, r.prior,
         'u.mean'  , U, '\n')
 
     ## Resampling
-    if(accept >= resample){
+    if((accept >= resample) && (U > 1e-100)){
       ## Weighted resampling:
       w <- exp(-E[,dim.par + 1] * delta / U)
       w <- w/sum(w)
