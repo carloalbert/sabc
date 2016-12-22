@@ -73,7 +73,9 @@ SABC.noninf <- function (f.dist, d.prior, r.prior,
 
   ## Redefinition of metric:
   Phi <- function(rho)
-    return(sum(rho.old < rho) / nrow(P))
+ return(
+      ifelse( rho<rho.old.min, (rho/rho.old.min)/nrow(P) , sum(rho.old < rho) / nrow(P) )
+       )
 
   f.dist.new <- function(theta, ...)
     return(Phi(f.dist(theta, ...)))
@@ -191,6 +193,7 @@ SABC.noninf <- function (f.dist, d.prior, r.prior,
 
   ## Distances in old metric
   rho.old <- P[,dim.par + 1]
+  rho.old.min <- min(P[,dim.par + 1])
 
   ## Define distances in new metric
   E[,dim.par+1] <- sapply(E[,dim.par+1], Phi, simplify=TRUE)
